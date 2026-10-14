@@ -25,6 +25,20 @@ public class Complaint
     public ComplaintStatus Status { get; set; } =
         ComplaintStatus.Submitted;
 
+    public void ChangeStatus(ComplaintStatus newStatus)
+    {
+        if(Status == ComplaintStatus.Submitted && newStatus == ComplaintStatus.Completed)
+        {
+            throw new InvalidOperationException("You cant directly change the ticket from submitted to completed");
+        }
+        if (Status == ComplaintStatus.Approved && newStatus == ComplaintStatus.Cancelled)
+        {
+            throw new InvalidOperationException("You cant directly change the ticket from Approved to Cancelled");
+        }
+
+        Status = newStatus;
+    }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
