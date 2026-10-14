@@ -17,5 +17,5 @@ public class QuoteItem
 
     public decimal UnitPrice { get; set; }
 
-    public decimal TotalPrice { get; set; }
+    public decimal TotalPrice => Quantity * UnitPrice;
 }
