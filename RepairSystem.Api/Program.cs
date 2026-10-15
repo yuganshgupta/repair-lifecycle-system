@@ -1,4 +1,16 @@
+using Microsoft.EntityFrameworkCore;
+using RepairSystem.Infrastructure.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+
+var connectionString = builder.Configuration
+    .GetConnectionString("RepairDatabase")
+    ?? throw new InvalidOperationException(
+        "Connection string 'RepairDatabase' was not found.");
+
+builder.Services.AddDbContext<RepairDbContext>(options =>
+    options.UseSqlServer(connectionString));
 
 // Add services to the container.
 
