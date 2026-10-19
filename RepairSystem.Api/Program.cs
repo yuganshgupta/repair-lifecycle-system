@@ -2,6 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using RepairSystem.Infrastructure.Data;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using RepairSystem.Domain.Entities;
+using RepairSystem.Application.Interfaces.Auth;
+using RepairSystem.Application.Interfaces.Users;
+using RepairSystem.Application.Services.Auth;
+using RepairSystem.Infrastructure.Repositories.Users;
 
 // start the API and load its configuration
 var builder = WebApplication.CreateBuilder(args);
@@ -51,6 +57,11 @@ var connectionString = builder.Configuration
 // so the API can request RepairDbContext through dependency injection
 builder.Services.AddDbContext<RepairDbContext>(options =>
     options.UseSqlServer(connectionString));
+
+// Register the services needed for user registration
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 
 // These are the checks the API uses before trusting a JWT

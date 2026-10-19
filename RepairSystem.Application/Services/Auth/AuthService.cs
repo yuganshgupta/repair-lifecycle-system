@@ -46,5 +46,39 @@ public class AuthService : IAuthService
     }
 
 
+    public async Task<LoginResult?> LoginAsync(LoginRequest request)
+    {
+        // Find the user using the email they entered
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await _userRepository.FindByEmailAsync(email);
+
+        // Don't allow login if the account doesn't exist or is inactive
+        if (user is null || !user.IsActive)
+        {
+            return null;
+        }
+
+        // Check the password against the stored hash
+        var passwordResult = _passwordHasher.VerifyHashedPassword(
+            user,
+            user.PasswordHash,
+            request.Password);
+
+        if (passwordResult == PasswordVerificationResult.Failed)
+        {
+            return null;
+        }
+
+        // Return only the information needed to create the login token
+        return new LoginResult
+        {
+            UserId = user.UserId,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role
+        };
+    }
+
+
 
 }

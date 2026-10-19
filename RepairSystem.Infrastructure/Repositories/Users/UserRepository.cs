@@ -30,6 +30,10 @@ public class UserRepository : IUserRepository
         await _context.SaveChangesAsync();
     }
 
-
+    public async Task<User?> FindByEmailAsync(string email)
+    {
+        return await _context.Users
+            .SingleOrDefaultAsync(user => user.Email == email);
+    }
 
 }

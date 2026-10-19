@@ -6,6 +6,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// This lets the Blazor page send requests to our API
+builder.Services.AddHttpClient("RepairApi", client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["ApiBaseUrl"]
+        ?? "http://localhost:5276/");
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
