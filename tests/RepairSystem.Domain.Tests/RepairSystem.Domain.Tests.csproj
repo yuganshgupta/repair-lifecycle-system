@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RepairSystem.Domain\RepairSystem.Domain.csproj" />
+    <ProjectReference Include="..\..\src\RepairSystem.Domain\RepairSystem.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

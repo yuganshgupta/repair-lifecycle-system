@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RepairSystem.Application\RepairSystem.Application.csproj" />
+    <ProjectReference Include="..\..\src\RepairSystem.Application\RepairSystem.Application.csproj" />
   </ItemGroup>
 
 </Project>

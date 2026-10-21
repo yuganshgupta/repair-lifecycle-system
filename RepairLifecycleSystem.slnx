@@ -1,9 +1,9 @@
 <Solution>
-  <Project Path="RepairSystem.Api/RepairSystem.Api.csproj" />
-  <Project Path="RepairSystem.Application.Tests/RepairSystem.Application.Tests.csproj" />
-  <Project Path="RepairSystem.Application/RepairSystem.Application.csproj" />
-  <Project Path="RepairSystem.Domain.Tests/RepairSystem.Domain.Tests.csproj" Id="4369dc3a-155e-4ca1-911d-1b2fd8827612" />
-  <Project Path="RepairSystem.Domain/RepairSystem.Domain.csproj" />
-  <Project Path="RepairSystem.Infrastructure/RepairSystem.Infrastructure.csproj" />
-  <Project Path="RepairSystem.Web/RepairSystem.Web.csproj" />
+  <Project Path="src/RepairSystem.Api/RepairSystem.Api.csproj" />
+  <Project Path="src/RepairSystem.Application/RepairSystem.Application.csproj" />
+  <Project Path="src/RepairSystem.Domain/RepairSystem.Domain.csproj" />
+  <Project Path="src/RepairSystem.Infrastructure/RepairSystem.Infrastructure.csproj" />
+  <Project Path="src/RepairSystem.Web/RepairSystem.Web.csproj" />
+  <Project Path="tests/RepairSystem.Domain.Tests/RepairSystem.Domain.Tests.csproj" Id="4369dc3a-155e-4ca1-911d-1b2fd8827612" />
+  <Project Path="tests/RepairSystem.Application.Tests/RepairSystem.Application.Tests.csproj" />
 </Solution>
