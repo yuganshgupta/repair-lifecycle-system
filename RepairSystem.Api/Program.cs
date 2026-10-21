@@ -1,13 +1,15 @@
-using Microsoft.EntityFrameworkCore;
-using RepairSystem.Infrastructure.Data;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
-using RepairSystem.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using RepairSystem.Api.OpenApi;
 using RepairSystem.Application.Interfaces.Auth;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Application.Services.Auth;
+using RepairSystem.Domain.Entities;
+using RepairSystem.Infrastructure.Data;
 using RepairSystem.Infrastructure.Repositories.Users;
+
 
 // start the API and load its configuration
 var builder = WebApplication.CreateBuilder(args);
@@ -86,7 +88,11 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<JwtBearerOpenApiTransformer>();
+    options.AddOperationTransformer<JwtBearerOpenApiTransformer>();
+});
 
 var app = builder.Build();
 
