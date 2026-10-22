@@ -54,6 +54,118 @@ public sealed class AuthServiceTests
         Assert.AreEqual(UserRole.Customer,u1.AddedUser.Role);
     }
 
+    [TestMethod]
+    public async Task LoginAsync_ReturnsUser_WhenCredentialsAreValid()
+    {
+        var u1 = new FakeUserRepository();
+        var passwordHasher = new PasswordHasher<User>();
+
+        var user = new User
+        {
+            FullName = "Test",
+            Email = "test@test.com",
+            IsActive = true,
+            Role = UserRole.Customer
+        };
+
+        user.PasswordHash = passwordHasher.HashPassword(user,"test1234");
+        u1.UserToFind = user;
+
+        var authService = new AuthService(u1, passwordHasher);
+
+        var request = new LoginRequest
+        {
+            Email = "test@test.com",
+            Password = "test1234"
+        };
+
+        var result = await authService.LoginAsync(request);
+        Assert.IsNotNull(result);
+        Assert.AreEqual("test@test.com", result.Email);
+        Assert.AreEqual("Test", result.FullName);
+        Assert.AreEqual(UserRole.Customer, result.Role);
+    }
+
+
+    [TestMethod]
+    public async Task LoginAsync_ReturnsNull_WhenPasswordIsIncorrect()
+    {
+        var repository = new FakeUserRepository();
+        var passwordHasher = new PasswordHasher<User>();
+
+        var user = new User
+        {
+            FullName = "Test",
+            Email = "test@test.com",
+            IsActive = true,
+            Role = UserRole.Customer
+        };
+
+        user.PasswordHash = passwordHasher.HashPassword(user, "test1234");
+        repository.UserToFind = user;
+
+        var authService = new AuthService(repository, passwordHasher);
+
+        var request = new LoginRequest
+        {
+            Email = "test@test.com",
+            Password = "wrongpassword"
+        };
+
+        var result = await authService.LoginAsync(request);
+
+        Assert.IsNull(result);
+    }
+
+    [TestMethod]
+    public async Task LoginAsync_ReturnsNull_WhenUserDoesNotExist()
+    {
+        var repository = new FakeUserRepository();
+        var passwordHasher = new PasswordHasher<User>();
+        var authService = new AuthService(repository, passwordHasher);
+
+        var request = new LoginRequest
+        {
+            Email = "missing@test.com",
+            Password = "test1234"
+        };
+
+        var result = await authService.LoginAsync(request);
+
+        Assert.IsNull(result);
+    }
+
+    [TestMethod]
+    public async Task LoginAsync_ReturnsNull_WhenUserIsInactive()
+    {
+        var repository = new FakeUserRepository();
+        var passwordHasher = new PasswordHasher<User>();
+
+        var user = new User
+        {
+            FullName = "Test",
+            Email = "test@test.com",
+            IsActive = false,
+            Role = UserRole.Customer
+        };
+
+        user.PasswordHash = passwordHasher.HashPassword(user, "test1234");
+        repository.UserToFind = user;
+
+        var authService = new AuthService(repository, passwordHasher);
+
+        var request = new LoginRequest
+        {
+            Email = "test@test.com",
+            Password = "test1234"
+        };
+
+        var result = await authService.LoginAsync(request);
+
+        Assert.IsNull(result);
+    }
+
+
     private sealed class FakeUserRepository : IUserRepository
     {
         public User? UserToFind { get; set; }
