@@ -5,7 +5,7 @@ namespace RepairSystem.Application.Interfaces.Auth;
 
 public interface IAuthService
 {
-    Task<bool> RegisterAsync(RegisterRequest request);
+    Task<bool> RegisterAsync(RegisterRequestDto request);
 
-    Task<LoginResult?> LoginAsync(LoginRequest request);
+    Task<LoginResultDto?> LoginAsync(LoginRequestDto request);
 }

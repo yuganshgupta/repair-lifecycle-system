@@ -18,7 +18,7 @@ public class AuthService : IAuthService
         _passwordHasher = passwordHasher;
     }
 
-    public async Task<bool> RegisterAsync(RegisterRequest request)
+    public async Task<bool> RegisterAsync(RegisterRequestDto request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
@@ -46,7 +46,7 @@ public class AuthService : IAuthService
     }
 
 
-    public async Task<LoginResult?> LoginAsync(LoginRequest request)
+    public async Task<LoginResultDto?> LoginAsync(LoginRequestDto request)
     {
         // Find the user using the email they entered
         var email = request.Email.Trim().ToLowerInvariant();
@@ -70,7 +70,7 @@ public class AuthService : IAuthService
         }
 
         // Return only the information needed to create the login token
-        return new LoginResult
+        return new LoginResultDto
         {
             UserId = user.UserId,
             FullName = user.FullName,

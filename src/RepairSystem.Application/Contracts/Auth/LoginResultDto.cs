@@ -2,7 +2,7 @@
 
 namespace RepairSystem.Application.Contracts.Auth;
 
-public class LoginResult
+public class LoginResultDto
 {
     public int UserId { get; set; }
     public string FullName { get; set; } = string.Empty;

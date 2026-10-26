@@ -19,7 +19,7 @@ public sealed class AuthServiceTests
         var passwordHasher = new PasswordHasher<User>();
         var authService = new AuthService(u1, passwordHasher);
 
-        var request = new RegisterRequest
+        var request = new RegisterRequestDto
         {
             FullName = "Test",
             Email = "test@test.com",
@@ -40,7 +40,7 @@ public sealed class AuthServiceTests
         var passwordHasher = new PasswordHasher<User>();
         var authService = new AuthService(u1, passwordHasher);
 
-        var request = new RegisterRequest
+        var request = new RegisterRequestDto
         {
             FullName = "Test",
             Email = "test@test.com",
@@ -73,7 +73,7 @@ public sealed class AuthServiceTests
 
         var authService = new AuthService(u1, passwordHasher);
 
-        var request = new LoginRequest
+        var request = new LoginRequestDto
         {
             Email = "test@test.com",
             Password = "test1234"
@@ -106,7 +106,7 @@ public sealed class AuthServiceTests
 
         var authService = new AuthService(repository, passwordHasher);
 
-        var request = new LoginRequest
+        var request = new LoginRequestDto
         {
             Email = "test@test.com",
             Password = "wrongpassword"
@@ -124,7 +124,7 @@ public sealed class AuthServiceTests
         var passwordHasher = new PasswordHasher<User>();
         var authService = new AuthService(repository, passwordHasher);
 
-        var request = new LoginRequest
+        var request = new LoginRequestDto
         {
             Email = "missing@test.com",
             Password = "test1234"
@@ -154,7 +154,7 @@ public sealed class AuthServiceTests
 
         var authService = new AuthService(repository, passwordHasher);
 
-        var request = new LoginRequest
+        var request = new LoginRequestDto
         {
             Email = "test@test.com",
             Password = "test1234"

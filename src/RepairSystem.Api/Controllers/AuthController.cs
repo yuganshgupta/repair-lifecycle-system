@@ -26,7 +26,7 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register(
-        [FromBody] RegisterRequest request)
+        [FromBody] RegisterRequestDto request)
     {
         var registered = await _authService.RegisterAsync(request);
 
@@ -47,7 +47,7 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login(
-        [FromBody] LoginRequest request)
+        [FromBody] LoginRequestDto request)
     {
         var user = await _authService.LoginAsync(request);
 
