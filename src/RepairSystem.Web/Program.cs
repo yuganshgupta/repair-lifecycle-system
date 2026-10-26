@@ -1,10 +1,22 @@
 using RepairSystem.Web.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using RepairSystem.Web.Services.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.AddScoped<
+    RepairAuthenticationStateProvider>();
+
+builder.Services.AddScoped<AuthenticationStateProvider>(
+    services => services.GetRequiredService<
+        RepairAuthenticationStateProvider>());
 
 // This lets the Blazor page send requests to our API
 builder.Services.AddHttpClient("RepairApi", client =>
