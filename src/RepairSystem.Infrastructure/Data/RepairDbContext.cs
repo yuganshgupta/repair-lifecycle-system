@@ -15,6 +15,8 @@ public class RepairDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -44,5 +46,34 @@ public class RepairDbContext : DbContext
             .WithMany()
             .HasForeignKey(complaint => complaint.AssignedTechnicianId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RefreshToken>()
+    .HasKey(token => token.RefreshTokenId);
+
+        modelBuilder.Entity<RefreshToken>()
+            .Property(token => token.TokenHash)
+            .HasMaxLength(64)
+            .IsRequired();
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(token => token.TokenHash)
+            .IsUnique();
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(token => token.FamilyId);
+
+        modelBuilder.Entity<RefreshToken>()
+            .Property(token => token.ReplacedByTokenHash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<RefreshToken>()
+            .Property(token => token.RowVersion)
+            .IsRowVersion();
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne(token => token.User)
+            .WithMany(user => user.RefreshTokens)
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -106,18 +106,18 @@ public class AuthController : ControllerBase
         var accessToken = new JwtSecurityTokenHandler()
             .WriteToken(token);
 
-        return Ok(new
-        {
-            accessToken,
-            tokenType = "Bearer",
-            expiresIn = accessTokenMinutes,
-            user = new
-            {
-                user.UserId,
-                user.FullName,
-                user.Email,
-                role = user.Role.ToString()
-            }
-        });
-    }
+		return Ok(new LoginResponseDto
+		{
+			AccessToken = accessToken,
+			TokenType = "Bearer",
+			ExpiresInMinutes = accessTokenMinutes,
+			User = new LoginUserDto
+			{
+				UserId = user.UserId,
+				FullName = user.FullName,
+				Email = user.Email,
+				Role = user.Role.ToString()
+			}
+		});
+	}
 }
