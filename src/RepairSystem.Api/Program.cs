@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RepairSystem.Api.OpenApi;
+using RepairSystem.Api.Security;
 using RepairSystem.Application.Interfaces.Auth;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Application.Services.Auth;
@@ -64,6 +65,12 @@ builder.Services.AddDbContext<RepairDbContext>(options =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+
+
+
+builder.Services.AddSingleton<
+    IAccessTokenGenerator,
+    JwtAccessTokenGenerator>();
 
 
 // These are the checks the API uses before trusting a JWT
