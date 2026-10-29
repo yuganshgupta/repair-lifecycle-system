@@ -1,5 +1,4 @@
-
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -8,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RepairSystem.Web.Features.Authentication.Contracts;
 using RepairSystem.Web.Services.Authentication;
 
 namespace RepairSystem.Web.Features.Authentication;
@@ -45,10 +45,10 @@ public sealed class WebAuthController : Controller
 
             using var response = await client.PostAsJsonAsync(
                 "api/auth/login",
-                new
+                new LoginApiRequestDto
                 {
-                    email = email.Trim(),
-                    password
+                    Email = email.Trim(),
+                    Password = password
                 });
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -61,36 +61,22 @@ public sealed class WebAuthController : Controller
                 return Redirect("/login?error=api");
             }
 
-            using var document =
-                await response.Content.ReadFromJsonAsync<JsonDocument>();
+            var loginResponse =
+                await response.Content.ReadFromJsonAsync<LoginApiResponseDto>();
+            var user = loginResponse?.User;
 
-            if (document is null ||
-                document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return Redirect("/login?error=api-response");
-            }
-
-            var root = document.RootElement;
-
-            if (!TryGetString(root, "accessToken", out var accessToken) ||
-                !TryGetString(root, "tokenType", out var tokenType) ||
+            if (loginResponse is null ||
+                string.IsNullOrWhiteSpace(loginResponse.AccessToken) ||
                 !string.Equals(
-                    tokenType,
+                    loginResponse.TokenType,
                     "Bearer",
                     StringComparison.OrdinalIgnoreCase) ||
-                !TryGetInt32(root, "expiresIn", out var expiresInMinutes) ||
-                expiresInMinutes <= 0 ||
-                !root.TryGetProperty("user", out var userElement) ||
-                userElement.ValueKind != JsonValueKind.Object)
-            {
-                return Redirect("/login?error=api-response");
-            }
-
-            if (!TryGetInt32(userElement, "userId", out var userId) ||
-                userId <= 0 ||
-                !TryGetString(userElement, "fullName", out var fullName) ||
-                !TryGetString(userElement, "email", out var userEmail) ||
-                !TryGetString(userElement, "role", out var role))
+                loginResponse.ExpiresInMinutes <= 0 ||
+                user is null ||
+                user.UserId <= 0 ||
+                string.IsNullOrWhiteSpace(user.FullName) ||
+                string.IsNullOrWhiteSpace(user.Email) ||
+                string.IsNullOrWhiteSpace(user.Role))
             {
                 return Redirect("/login?error=api-response");
             }
@@ -98,25 +84,24 @@ public sealed class WebAuthController : Controller
             var now = DateTimeOffset.UtcNow;
             var sessionExpiresAtUtc = now.AddHours(
                 WebAuthenticationDefaults.SessionLifetimeHours);
-
             var sessionId = Guid.NewGuid().ToString("N");
 
             // Keep the API JWT on the server, not in browser storage.
             _tokenStore.Save(
                 sessionId,
                 new ApiTokenSession(
-                    AccessToken: accessToken,
-                    AccessTokenExpiresAtUtc: now.AddMinutes(expiresInMinutes),
+                    AccessToken: loginResponse.AccessToken,
+                    AccessTokenExpiresAtUtc: now.AddMinutes(loginResponse.ExpiresInMinutes),
                     SessionExpiresAtUtc: sessionExpiresAtUtc));
 
             var claims = new List<Claim>
             {
                 new(
                     ClaimTypes.NameIdentifier,
-                    userId.ToString(CultureInfo.InvariantCulture)),
-                new(ClaimTypes.Name, fullName),
-                new(ClaimTypes.Email, userEmail),
-                new(ClaimTypes.Role, role),
+                    user.UserId.ToString(CultureInfo.InvariantCulture)),
+                new(ClaimTypes.Name, user.FullName),
+                new(ClaimTypes.Email, user.Email),
+                new(ClaimTypes.Role, user.Role),
                 new(
                     WebAuthenticationDefaults.SessionIdClaimType,
                     sessionId)
@@ -125,7 +110,6 @@ public sealed class WebAuthController : Controller
             var identity = new ClaimsIdentity(
                 claims,
                 CookieAuthenticationDefaults.AuthenticationScheme);
-
             var principal = new ClaimsPrincipal(identity);
 
             await HttpContext.SignInAsync(
@@ -172,37 +156,5 @@ public sealed class WebAuthController : Controller
             CookieAuthenticationDefaults.AuthenticationScheme);
 
         return Redirect("/login?loggedOut=true");
-    }
-
-    private static bool TryGetString(
-        JsonElement element,
-        string propertyName,
-        out string value)
-    {
-        value = string.Empty;
-
-        if (element.ValueKind != JsonValueKind.Object ||
-            !element.TryGetProperty(propertyName, out var property) ||
-            property.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        value = property.GetString() ?? string.Empty;
-
-        return !string.IsNullOrWhiteSpace(value);
-    }
-
-    private static bool TryGetInt32(
-        JsonElement element,
-        string propertyName,
-        out int value)
-    {
-        value = 0;
-
-        return element.ValueKind == JsonValueKind.Object &&
-               element.TryGetProperty(propertyName, out var property) &&
-               property.ValueKind == JsonValueKind.Number &&
-               property.TryGetInt32(out value);
     }
 }
