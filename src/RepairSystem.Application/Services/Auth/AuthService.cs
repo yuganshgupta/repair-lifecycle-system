@@ -79,6 +79,47 @@ public class AuthService : IAuthService
         };
     }
 
+    public async Task<bool> CreateUserAsync(
+    CreateUserRequestDto request)
+    {
+        var role = request.Role switch
+        {
+            nameof(UserRole.Customer) => UserRole.Customer,
+            nameof(UserRole.Technician) => UserRole.Technician,
+            nameof(UserRole.Admin) => UserRole.Admin,
+            _ => (UserRole?)null
+        };
+
+        if (role is null)
+        {
+            return false;
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        if (await _userRepository.EmailExistsAsync(email))
+        {
+            return false;
+        }
+
+        var user = new User
+        {
+            FullName = request.FullName.Trim(),
+            Email = email,
+            Role = role.Value,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        user.PasswordHash = _passwordHasher.HashPassword(
+            user,
+            request.Password);
+
+        await _userRepository.AddAsync(user);
+
+        return true;
+    }
+
 
 
 }

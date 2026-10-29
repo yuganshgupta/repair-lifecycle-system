@@ -43,7 +43,29 @@ public class AuthController : ControllerBase
 		});
 	}
 
-	[AllowAnonymous]
+    [Authorize(Roles = "Admin")]
+    [HttpPost("users")]
+    public async Task<IActionResult> CreateUser(
+    [FromBody] CreateUserRequestDto request)
+    {
+        var created = await _authService.CreateUserAsync(request);
+
+        if (!created)
+        {
+            return Conflict(new
+            {
+                message = "An account with this email already exists, " +
+                          "or the requested role is invalid."
+            });
+        }
+
+        return StatusCode(StatusCodes.Status201Created, new
+        {
+            message = "User account created successfully."
+        });
+    }
+
+    [AllowAnonymous]
 	[HttpPost("login")]
 	public async Task<IActionResult> Login(
 		[FromBody] LoginRequestDto request)

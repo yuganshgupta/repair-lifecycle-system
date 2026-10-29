@@ -1,0 +1,76 @@
+﻿
+@page "/dashboard"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="container mt-4">
+    <AuthorizeView>
+        <Authorized Context="authState">
+            <h1 class="mb-2">Dashboard</h1>
+            <p class="text-muted">
+                Welcome, @authState.User.Identity?.Name.
+            </p>
+
+            <div class="mb-4">
+                <span class="badge bg-secondary">
+                    @authState.User.FindFirst(
+                        System.Security.Claims.ClaimTypes.Role)?.Value
+                </span>
+            </div>
+
+            @if (authState.User.IsInRole("Customer"))
+            {
+                <section class="card mb-3">
+                    <div class="card-body">
+                        <h2 class="h5">Customer dashboard</h2>
+                        <p>
+                            Submit repair complaints and track your existing repairs.
+                        </p>
+                        <p class="text-muted mb-0">
+                            Complaint features will be connected in a later milestone.
+                        </p>
+                    </div>
+                </section>
+            }
+
+            @if (authState.User.IsInRole("Technician"))
+            {
+                <section class="card mb-3">
+                    <div class="card-body">
+                        <h2 class="h5">Technician dashboard</h2>
+                        <p>
+                            Review assigned repair jobs and update repair progress.
+                        </p>
+                        <p class="text-muted mb-0">
+                            Assignment and diagnosis features will be connected later.
+                        </p>
+                    </div>
+                </section>
+            }
+
+            @if (authState.User.IsInRole("Admin"))
+            {
+                <section class="card mb-3">
+                    <div class="card-body">
+                        <h2 class="h5">Admin dashboard</h2>
+                        <p>
+                            Review repair activity and manage technician assignments.
+                        </p>
+                        <p class="text-muted mb-0">
+                            Administration operations will be connected later.
+                        </p>
+                    </div>
+                </section>
+            }
+
+            <form method="post" action="/auth/logout">
+                <AntiforgeryToken />
+                <button type="submit" class="btn btn-outline-secondary">
+                    Sign out
+                </button>
+            </form>
+        </Authorized>
+    </AuthorizeView>
+</div>

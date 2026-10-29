@@ -166,6 +166,84 @@ public sealed class AuthServiceTests
     }
 
 
+    [TestMethod]
+    public async Task CreateUserAsync_CreatesTechnician_WhenRequestIsValid()
+    {
+        var repository = new FakeUserRepository();
+        var passwordHasher = new PasswordHasher<User>();
+        var authService = new AuthService(repository, passwordHasher);
+
+        var request = new CreateUserRequestDto
+        {
+            FullName = "Test Technician",
+            Email = "technician@test.com",
+            Password = "technician123",
+            Role = "Technician"
+        };
+
+        var result = await authService.CreateUserAsync(request);
+
+        Assert.IsTrue(result);
+        Assert.IsNotNull(repository.AddedUser);
+        Assert.AreEqual(UserRole.Technician, repository.AddedUser.Role);
+        Assert.AreEqual(
+            "technician@test.com",
+            repository.AddedUser.Email);
+        Assert.AreNotEqual(
+            request.Password,
+            repository.AddedUser.PasswordHash);
+    }
+
+    [TestMethod]
+    public async Task CreateUserAsync_ReturnsFalse_WhenEmailAlreadyExists()
+    {
+        var repository = new FakeUserRepository
+        {
+            EmailExists = true
+        };
+
+        var authService = new AuthService(
+            repository,
+            new PasswordHasher<User>());
+
+        var request = new CreateUserRequestDto
+        {
+            FullName = "Another Technician",
+            Email = "existing@test.com",
+            Password = "technician123",
+            Role = "Technician"
+        };
+
+        var result = await authService.CreateUserAsync(request);
+
+        Assert.IsFalse(result);
+        Assert.IsNull(repository.AddedUser);
+    }
+
+    [TestMethod]
+    public async Task CreateUserAsync_ReturnsFalse_WhenRoleIsInvalid()
+    {
+        var repository = new FakeUserRepository();
+
+        var authService = new AuthService(
+            repository,
+            new PasswordHasher<User>());
+
+        var request = new CreateUserRequestDto
+        {
+            FullName = "Unexpected Role",
+            Email = "unexpected@test.com",
+            Password = "password123",
+            Role = "SuperAdmin"
+        };
+
+        var result = await authService.CreateUserAsync(request);
+
+        Assert.IsFalse(result);
+        Assert.IsNull(repository.AddedUser);
+    }
+
+
     private sealed class FakeUserRepository : IUserRepository
     {
         public User? UserToFind { get; set; }

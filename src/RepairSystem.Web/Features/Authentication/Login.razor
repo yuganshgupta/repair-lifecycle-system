@@ -1,0 +1,110 @@
+﻿@page "/"
+@page "/login"
+@rendermode InteractiveServer
+
+<PageTitle>Sign In</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <AuthorizeView>
+                <Authorized Context="authState">
+                    <h2 class="mb-2">You're signed in</h2>
+                    <p class="text-muted">
+                        Welcome, @authState.User.Identity?.Name.
+                    </p>
+
+                    <a href="/dashboard" class="btn btn-primary w-100 mb-3">
+                        Open dashboard
+                    </a>
+
+                    <form method="post" action="/auth/logout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn btn-outline-secondary w-100">
+                            Sign out
+                        </button>
+                    </form>
+                </Authorized>
+
+                <NotAuthorized>
+                    <h2 class="mb-2">Sign in</h2>
+                    <p class="text-muted mb-4">
+                        Sign in to your Repair Lifecycle account.
+                    </p>
+
+                    @if (LoggedOut == "true")
+                    {
+                        <div class="alert alert-success">
+                            You have signed out.
+                        </div>
+                    }
+
+                    @if (Error == "invalid")
+                    {
+                        <div class="alert alert-danger">
+                            Invalid email or password.
+                        </div>
+                    }
+                    else if (Error == "api-unavailable")
+                    {
+                        <div class="alert alert-danger">
+                            Could not connect to the API. Make sure it is running.
+                        </div>
+                    }
+                    else if (Error == "api-response")
+                    {
+                        <div class="alert alert-danger">
+                            The API returned an unexpected response.
+                        </div>
+                    }
+                    else if (Error == "api")
+                    {
+                        <div class="alert alert-danger">
+                            Login failed because the API returned an error.
+                        </div>
+                    }
+
+                    <form method="post" action="/auth/login">
+                        <AntiforgeryToken />
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">
+                                Email address
+                            </label>
+                            <input id="email"
+                                   name="email"
+                                   class="form-control"
+                                   type="email"
+                                   autocomplete="username"
+                                   required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">
+                                Password
+                            </label>
+                            <input id="password"
+                                   name="password"
+                                   class="form-control"
+                                   type="password"
+                                   autocomplete="current-password"
+                                   required />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            Sign in
+                        </button>
+                    </form>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "loggedOut")]
+    public string? LoggedOut { get; set; }
+}
