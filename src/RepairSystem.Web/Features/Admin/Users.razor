@@ -1,0 +1,270 @@
+﻿@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using RepairSystem.Web.Features.Admin.Contracts
+
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApiTokenSessionStore TokenStore
+
+<PageTitle>Manage Users</PageTitle>
+
+<div class="container mt-4 mb-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">Manage user accounts</h1>
+            <p class="text-muted mb-0">
+                Create accounts and assign system roles.
+            </p>
+        </div>
+
+        <a href="/dashboard" class="btn btn-outline-secondary">
+            Back to dashboard
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="alert @(_isError ? "alert-danger" : "alert-success")"
+             role="alert">
+            @_message
+        </div>
+    }
+
+    <section class="card">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Create user</h2>
+
+            <EditForm Model="_form" OnValidSubmit="CreateUserAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="fullName" class="form-label">
+                            Full name
+                        </label>
+
+                        <InputText id="fullName"
+                                   class="form-control"
+                                   autocomplete="name"
+                                   @bind-Value="_form.FullName" />
+
+                        <ValidationMessage For="@(() => _form.FullName)" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="email" class="form-label">
+                            Email address
+                        </label>
+
+                        <InputText id="email"
+                                   class="form-control"
+                                   type="email"
+                                   autocomplete="email"
+                                   @bind-Value="_form.Email" />
+
+                        <ValidationMessage For="@(() => _form.Email)" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="password" class="form-label">
+                            Temporary password
+                        </label>
+
+                        <InputText id="password"
+                                   class="form-control"
+                                   type="password"
+                                   autocomplete="new-password"
+                                   @bind-Value="_form.Password" />
+
+                        <div class="form-text">
+                            Must contain at least 8 characters.
+                        </div>
+
+                        <ValidationMessage For="@(() => _form.Password)" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="role" class="form-label">
+                            Role
+                        </label>
+
+                        <InputSelect id="role"
+                                     class="form-select"
+                                     @bind-Value="_form.Role">
+                            <option value="Customer">Customer</option>
+                            <option value="Technician">Technician</option>
+                            <option value="Admin">Admin</option>
+                        </InputSelect>
+
+                        <ValidationMessage For="@(() => _form.Role)" />
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@_isSubmitting">
+                        @(_isSubmitting
+                            ? "Creating account..."
+                            : "Create account")
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            disabled="@_isSubmitting"
+                            @onclick="ResetForm">
+                        Clear
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </section>
+</div>
+
+@code {
+    private CreateUserApiRequest _form = new();
+    private bool _isSubmitting;
+    private bool _isError;
+    private string? _message;
+
+    private void ResetForm()
+    {
+        _form = new CreateUserApiRequest
+        {
+            Role = _form.Role
+        };
+
+        _message = null;
+        _isError = false;
+    }
+
+    private async Task CreateUserAsync()
+    {
+        if (_isSubmitting)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _message = null;
+        _isError = false;
+
+        try
+        {
+            var authState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated != true ||
+                !user.IsInRole("Admin"))
+            {
+                ShowError(
+                    "Only an authenticated Admin can create accounts.");
+                return;
+            }
+
+            var sessionId = user
+                .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                !TokenStore.TryGet(sessionId, out var session) ||
+                session is null)
+            {
+                ShowError(
+                    "Your session is unavailable. Sign out and sign in again.");
+                return;
+            }
+
+            if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                ShowError(
+                    "Your API token has expired. Sign out and sign in again.");
+                return;
+            }
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                "api/auth/users")
+            {
+                Content = JsonContent.Create(_form)
+            };
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    session.AccessToken);
+
+            using var response = await client.SendAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.Created)
+            {
+                var createdRole = _form.Role;
+
+                _form = new CreateUserApiRequest
+                {
+                    Role = createdRole
+                };
+
+                _message = $"{createdRole} account created successfully.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Conflict)
+            {
+                ShowError(
+                    "An account with this email already exists, " +
+                    "or the requested role was rejected.");
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                ShowError(
+                    "The API rejected your session. Sign in again.");
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                ShowError(
+                    "The API denied this operation. Check your Admin role.");
+                return;
+            }
+
+            ShowError(
+                $"Could not create account. API returned " +
+                $"{(int)response.StatusCode} ({response.StatusCode}).");
+        }
+        catch (HttpRequestException)
+        {
+            ShowError(
+                "Could not connect to the API. Make sure it is running.");
+        }
+        catch (TaskCanceledException)
+        {
+            ShowError(
+                "The API request timed out. Check the API and try again.");
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void ShowError(string message)
+    {
+        _message = message;
+        _isError = true;
+    }
+}
