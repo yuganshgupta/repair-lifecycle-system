@@ -10,6 +10,9 @@ using RepairSystem.Application.Services.Auth;
 using RepairSystem.Domain.Entities;
 using RepairSystem.Infrastructure.Data;
 using RepairSystem.Infrastructure.Repositories.Users;
+using RepairSystem.Application.Interfaces.Complaints;
+using RepairSystem.Application.Services.Complaints;
+using RepairSystem.Infrastructure.Repositories.Complaints;
 
 
 // start the API and load its configuration
@@ -66,6 +69,13 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
+builder.Services.AddScoped<
+    IComplaintRepository,
+    ComplaintRepository>();
+
+builder.Services.AddScoped<
+    IComplaintService,
+    ComplaintService>();
 
 
 builder.Services.AddSingleton<

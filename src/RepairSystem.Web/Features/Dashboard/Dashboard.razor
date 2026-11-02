@@ -1,7 +1,16 @@
-﻿
-@page "/dashboard"
+﻿@page "/dashboard"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using System.Text.Json
+@using RepairSystem.Web.Features.Dashboard.Contracts
+@using Microsoft.AspNetCore.Components.Forms
+
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApiTokenSessionStore TokenStore
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -15,23 +24,286 @@
 
             <div class="mb-4">
                 <span class="badge bg-secondary">
-                    @authState.User.FindFirst(
-                        System.Security.Claims.ClaimTypes.Role)?.Value
+                    @(authState.User.FindFirst(
+                        System.Security.Claims.ClaimTypes.Role)?.Value)
                 </span>
             </div>
 
             @if (authState.User.IsInRole("Customer"))
             {
-                <section class="card mb-3">
-                    <div class="card-body">
-                        <h2 class="h5">Customer dashboard</h2>
-                        <p>
-                            Submit repair complaints and track your existing repairs.
-                        </p>
-                        <p class="text-muted mb-0">
-                            Complaint features will be connected in a later milestone.
-                        </p>
+                <section class="mb-4">
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h2 class="h4">My Repair Requests</h2>
+                            <p class="text-muted">
+                                Track the progress of your submitted repair requests.
+                            </p>
+                        </div>
+
+                        <button type="button"
+                                class="btn btn-primary"
+                                @onclick="OpenComplaintForm">
+                            <i class="bi bi-plus-lg me-1"></i>
+                            New Repair Request
+                        </button>
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_complaintSuccessMessage))
+                    {
+                        <div class="alert alert-success" role="alert">
+                            @_complaintSuccessMessage
+                        </div>
+                    }
+
+                    @if (_showComplaintForm)
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header bg-white py-3">
+                                <h3 class="h5 mb-0">Submit a Repair Request</h3>
+                            </div>
+
+                            <div class="card-body">
+
+                                @if (!string.IsNullOrWhiteSpace(_complaintFormError))
+                                {
+                                    <div class="alert alert-danger">
+                                        @_complaintFormError
+                                    </div>
+                                }
+
+                                <EditForm Model="@_newComplaint"
+                                          OnValidSubmit="SubmitComplaintAsync">
+
+                                    <DataAnnotationsValidator />
+                                    <ValidationSummary />
+
+                                    <div class="row g-3">
+
+                                        <div class="col-md-6">
+                                            <label class="form-label">Device Type</label>
+                                            <InputText class="form-control"
+                                                       @bind-Value="_newComplaint.DeviceType"
+                                                       placeholder="e.g. Laptop" />
+                                            <ValidationMessage For="@(() => _newComplaint.DeviceType)" />
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label">Brand</label>
+                                            <InputText class="form-control"
+                                                       @bind-Value="_newComplaint.DeviceBrand"
+                                                       placeholder="e.g. Dell" />
+                                            <ValidationMessage For="@(() => _newComplaint.DeviceBrand)" />
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label">Model</label>
+                                            <InputText class="form-control"
+                                                       @bind-Value="_newComplaint.DeviceModel"
+                                                       placeholder="e.g. Inspiron 15" />
+                                            <ValidationMessage For="@(() => _newComplaint.DeviceModel)" />
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label">
+                                                Serial Number (Optional)
+                                            </label>
+                                            <InputText class="form-control"
+                                                       @bind-Value="_newComplaint.SerialNumber"
+                                                       placeholder="Enter serial number" />
+                                            <ValidationMessage For="@(() => _newComplaint.SerialNumber)" />
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label">Describe the Issue</label>
+                                            <InputTextArea class="form-control"
+                                                           rows="4"
+                                                           @bind-Value="_newComplaint.IssueDescription"
+                                                           placeholder="Describe the problem with your device..." />
+                                            <ValidationMessage For="@(() => _newComplaint.IssueDescription)" />
+                                        </div>
+
+                                        <div class="col-12">
+                                            <div class="form-check">
+                                                <InputCheckbox id="claimedWarranty"
+                                                               class="form-check-input"
+                                                               @bind-Value="_newComplaint.ClaimedWarranty" />
+
+                                                <label class="form-check-label"
+                                                       for="claimedWarranty">
+                                                    This device is covered under warranty.
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12 d-flex gap-2">
+                                            <button type="submit"
+                                                    class="btn btn-primary"
+                                                    disabled="@_isSubmittingComplaint">
+
+                                                @if (_isSubmittingComplaint)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                                    <span>Submitting...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Submit Request</span>
+                                                }
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary"
+                                                    @onclick="CancelComplaintForm"
+                                                    disabled="@_isSubmittingComplaint">
+                                                Cancel
+                                            </button>
+                                        </div>
+
+                                    </div>
+                                </EditForm>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_isLoadingComplaints)
+                    {
+                        <div class="card">
+                            <div class="card-body text-center p-5">
+                                <div class="spinner-border text-primary"
+                                     role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="text-muted mt-3 mb-0">
+                                    Loading your repair requests...
+                                </p>
+                            </div>
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_complaintsError))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @_complaintsError
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row g-3 mb-4">
+
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <p class="text-muted mb-2">Open Repairs</p>
+                                        <h3 class="mb-0">
+                                            @_customerComplaints.Count(c =>
+                                                c.Status != "Completed" &&
+                                                c.Status != "Cancelled")
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <p class="text-muted mb-2">
+                                            Awaiting Quote
+                                        </p>
+                                        <h3 class="mb-0">
+                                            @_customerComplaints.Count(c =>
+                                                c.Status == "QuotePending")
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <p class="text-muted mb-2">
+                                            Completed Repairs
+                                        </p>
+                                        <h3 class="mb-0">
+                                            @_customerComplaints.Count(c =>
+                                                c.Status == "Completed")
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-white py-3">
+                                <h3 class="h5 mb-0">Repair History</h3>
+                            </div>
+
+                            @if (_customerComplaints.Count == 0)
+                            {
+                                <div class="card-body text-center py-5">
+                                    <h4 class="h5">No repair requests yet</h4>
+
+                                    <p class="text-muted mb-0">
+                                        Your submitted repair requests will appear here.
+                                    </p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Ticket Number</th>
+                                                <th>Device</th>
+                                                <th>Issue</th>
+                                                <th>Submitted</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            @foreach (var complaint in _customerComplaints
+                                                .OrderByDescending(c => c.CreatedAt))
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <strong>
+                                                            @complaint.TicketNumber
+                                                        </strong>
+                                                    </td>
+
+                                                    <td>
+                                                        <div>
+                                                            @GetDeviceName(complaint)
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            @complaint.DeviceType
+                                                        </small>
+                                                    </td>
+
+                                                    <td>
+                                                        @complaint.IssueDescription
+                                                    </td>
+
+                                                    <td>
+                                                        @complaint.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
+                                                    </td>
+
+                                                    <td>
+                                                        <span class="badge @GetStatusBadgeClass(complaint.Status)">
+                                                            @FormatStatus(complaint.Status)
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    }
+
                 </section>
             }
 
@@ -76,3 +348,293 @@
         </Authorized>
     </AuthorizeView>
 </div>
+
+@code {
+    private CreateComplaintApiRequest _newComplaint = new();
+
+    private bool _showComplaintForm;
+
+    private bool _isSubmittingComplaint;
+
+    private string? _complaintFormError;
+
+    private string? _complaintSuccessMessage;
+
+    private IReadOnlyList<CustomerComplaintApiDto> _customerComplaints
+        = Array.Empty<CustomerComplaintApiDto>();
+
+    private bool _isLoadingComplaints = true;
+
+    private string? _complaintsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.IsInRole("Customer"))
+        {
+            await LoadCustomerComplaintsAsync(
+                authState.User);
+        }
+
+        _isLoadingComplaints = false;
+    }
+
+    private async Task LoadCustomerComplaintsAsync(
+        System.Security.Claims.ClaimsPrincipal user)
+    {
+        try
+        {
+            var sessionId = user
+                .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                !TokenStore.TryGet(sessionId, out var session) ||
+                session is null)
+            {
+                _complaintsError =
+                    "Your session is unavailable. Please sign in again.";
+                return;
+            }
+
+            if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                _complaintsError =
+                    "Your API access token has expired. Please sign in again.";
+                return;
+            }
+
+            var client =
+                HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                "api/Complaints");
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    session.AccessToken);
+
+            using var response = await client.SendAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _complaintsError =
+                    "Your API session has expired. Please sign in again.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _complaintsError =
+                    "You do not have permission to view these complaints.";
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _complaintsError =
+                    $"Could not load repair requests. API returned " +
+                    $"{(int)response.StatusCode}.";
+                return;
+            }
+
+            var complaints =
+                await response.Content.ReadFromJsonAsync<
+                    List<CustomerComplaintApiDto>>();
+
+            if (complaints is not null)
+            {
+                _customerComplaints = complaints;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _complaintsError =
+                "Could not connect to the API. Make sure it is running.";
+        }
+        catch (TaskCanceledException)
+        {
+            _complaintsError =
+                "The request timed out. Please try again.";
+        }
+        catch (JsonException)
+        {
+            _complaintsError =
+                "The API returned an invalid response.";
+        }
+    }
+
+    private void OpenComplaintForm()
+    {
+        _newComplaint = new();
+        _complaintFormError = null;
+        _complaintSuccessMessage = null;
+        _showComplaintForm = true;
+    }
+
+    private void CancelComplaintForm()
+    {
+        _showComplaintForm = false;
+        _newComplaint = new();
+        _complaintFormError = null;
+    }
+
+    private async Task SubmitComplaintAsync()
+    {
+        if (_isSubmittingComplaint)
+            return;
+
+        _isSubmittingComplaint = true;
+        _complaintFormError = null;
+        _complaintSuccessMessage = null;
+
+        try
+        {
+            var authState =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            var user = authState.User;
+
+            var sessionId = user
+                .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                !TokenStore.TryGet(sessionId, out var session) ||
+                session is null)
+            {
+                _complaintFormError =
+                    "Your session is unavailable. Please sign in again.";
+                return;
+            }
+
+            if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                _complaintFormError =
+                    "Your API access token has expired. Please sign in again.";
+                return;
+            }
+
+            var client =
+                HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                "api/Complaints");
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    session.AccessToken);
+
+            request.Content = JsonContent.Create(_newComplaint);
+
+            using var response = await client.SendAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _complaintFormError =
+                    "Your API session has expired. Please sign in again.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _complaintFormError =
+                    "You do not have permission to submit complaints.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                _complaintFormError =
+                    "The API rejected the complaint details. Please check your entries.";
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Created)
+            {
+                _complaintFormError =
+                    $"Could not submit the complaint. API returned " +
+                    $"{(int)response.StatusCode}.";
+                return;
+            }
+
+            // A 201 response means the API successfully created the complaint.
+            CustomerComplaintApiDto? createdComplaint = null;
+
+            try
+            {
+                createdComplaint =
+                    await response.Content.ReadFromJsonAsync<CustomerComplaintApiDto>();
+            }
+            catch (JsonException)
+            {
+                // Creation succeeded; continue with the dashboard refresh.
+            }
+
+            _newComplaint = new();
+            _showComplaintForm = false;
+
+            _complaintSuccessMessage = createdComplaint is not null
+                ? $"Repair request {createdComplaint.TicketNumber} submitted successfully."
+                : "Your repair request was submitted successfully.";
+
+            // Retrieve the updated list from the API.
+            _complaintsError = null;
+
+            await LoadCustomerComplaintsAsync(user);
+        }
+        catch (HttpRequestException)
+        {
+            _complaintFormError =
+                "Could not connect to the API. Make sure it is running.";
+        }
+        catch (TaskCanceledException)
+        {
+            _complaintFormError =
+                "The request timed out. Please try again.";
+        }
+        finally
+        {
+            _isSubmittingComplaint = false;
+        }
+    }
+
+    private static string GetDeviceName(
+        CustomerComplaintApiDto complaint)
+    {
+        return $"{complaint.DeviceBrand} {complaint.DeviceModel}".Trim();
+    }
+
+    private static string FormatStatus(string status)
+    {
+        return status switch
+        {
+            "InDiagnosis" => "In Diagnosis",
+            "QuotePending" => "Quote Pending",
+            "InRepair" => "In Repair",
+            _ => status
+        };
+    }
+
+    private static string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Submitted" => "bg-secondary",
+            "Assigned" => "bg-primary",
+            "InDiagnosis" => "bg-info text-dark",
+            "QuotePending" => "bg-warning text-dark",
+            "Approved" => "bg-success",
+            "InRepair" => "bg-primary",
+            "Completed" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using RepairSystem.Application.Interfaces.Auth;
+using RepairSystem.Application.Interfaces.Complaints;
 
 namespace RepairSystem.Api.Tests;
 
@@ -20,6 +21,8 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
         Encoding.UTF8.GetBytes("0123456789ABCDEF0123456789ABCDEF");
 
     public FakeAuthService FakeAuthService { get; } = new();
+
+    public FakeComplaintService FakeComplaintService { get; } = new();
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -51,6 +54,9 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IAuthService>();
             services.AddSingleton<IAuthService>(FakeAuthService);
+
+            services.RemoveAll<IComplaintService>();
+            services.AddSingleton<IComplaintService>(FakeComplaintService);
         });
     }
 }
