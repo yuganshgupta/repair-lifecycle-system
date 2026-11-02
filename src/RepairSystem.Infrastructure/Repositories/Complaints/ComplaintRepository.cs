@@ -30,4 +30,16 @@ public sealed class ComplaintRepository : IComplaintRepository
 
         await _context.SaveChangesAsync();
     }
+
+    public async Task<IReadOnlyList<Complaint>> GetAssignedToTechnicianAsync(
+    int technicianId)
+    {
+        return await _context.Complaints
+            .AsNoTracking()
+            .Where(complaint =>
+                complaint.AssignedTechnicianId == technicianId)
+            .Include(complaint => complaint.Customer)
+            .OrderByDescending(complaint => complaint.CreatedAt)
+            .ToListAsync();
+    }
 }

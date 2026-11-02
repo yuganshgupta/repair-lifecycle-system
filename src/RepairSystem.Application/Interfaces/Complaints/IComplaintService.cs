@@ -10,4 +10,7 @@ public interface IComplaintService
     Task<CustomerComplaintDto> CreateCustomerComplaintAsync(
         int customerId,
         CreateComplaintRequestDto request);
+
+    Task<IReadOnlyList<TechnicianComplaintDto>>
+    GetTechnicianComplaintsAsync(int technicianId);
 }

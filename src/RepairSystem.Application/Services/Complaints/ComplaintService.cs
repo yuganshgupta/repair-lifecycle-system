@@ -81,4 +81,37 @@ public sealed class ComplaintService : IComplaintService
             UpdatedAt = complaint.UpdatedAt
         };
     }
+
+    public async Task<IReadOnlyList<TechnicianComplaintDto>>
+    GetTechnicianComplaintsAsync(int technicianId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(technicianId);
+
+        var complaints =
+            await _complaintRepository.GetAssignedToTechnicianAsync(
+                technicianId);
+
+        return complaints.Select(complaint =>
+            new TechnicianComplaintDto
+            {
+                ComplaintId = complaint.ComplaintId,
+                TicketNumber = complaint.TicketNumber,
+
+                CustomerName = complaint.Customer.FullName,
+
+                DeviceType = complaint.DeviceType,
+                DeviceBrand = complaint.DeviceBrand,
+                DeviceModel = complaint.DeviceModel,
+                SerialNumber = complaint.SerialNumber,
+
+                IssueDescription = complaint.IssueDescription,
+                ClaimedWarranty = complaint.ClaimedWarranty,
+
+                Status = complaint.Status.ToString(),
+
+                CreatedAt = complaint.CreatedAt,
+                UpdatedAt = complaint.UpdatedAt
+            })
+            .ToList();
+    }
 }

@@ -8,4 +8,7 @@ public interface IComplaintRepository
         int customerId);
 
     Task AddAsync(Complaint complaint);
+
+    Task<IReadOnlyList<Complaint>> GetAssignedToTechnicianAsync(
+    int technicianId);
 }

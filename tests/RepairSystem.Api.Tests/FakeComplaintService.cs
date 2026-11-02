@@ -15,6 +15,13 @@ public sealed class FakeComplaintService : IComplaintService
 
     public CreateComplaintRequestDto? LastCreateRequest { get; private set; }
 
+    public int TechnicianCallCount { get; private set; }
+
+    public int? LastRequestedTechnicianId { get; private set; }
+
+    public IReadOnlyList<TechnicianComplaintDto> TechnicianComplaints { get; set; }
+        = Array.Empty<TechnicianComplaintDto>();
+
     public IReadOnlyList<CustomerComplaintDto> Complaints { get; set; }
         = Array.Empty<CustomerComplaintDto>();
 
@@ -49,5 +56,14 @@ public sealed class FakeComplaintService : IComplaintService
         LastCreateRequest = request;
 
         return Task.FromResult(CreatedComplaint);
+    }
+
+    public Task<IReadOnlyList<TechnicianComplaintDto>>
+    GetTechnicianComplaintsAsync(int technicianId)
+    {
+        TechnicianCallCount++;
+        LastRequestedTechnicianId = technicianId;
+
+        return Task.FromResult(TechnicianComplaints);
     }
 }
