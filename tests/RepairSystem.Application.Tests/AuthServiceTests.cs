@@ -290,5 +290,12 @@ public sealed class AuthServiceTests
 
             return Task.CompletedTask;
         }
+
+        public int ActiveAdminCount { get; set; } = 2;
+
+        public Task<int> CountActiveAdminsAsync()
+        {
+            return Task.FromResult(ActiveAdminCount);
+        }
     }
 }

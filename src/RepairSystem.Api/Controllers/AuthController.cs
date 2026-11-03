@@ -5,6 +5,7 @@ using RepairSystem.Api.Security;
 using RepairSystem.Application.Contracts.Auth;
 using RepairSystem.Application.Contracts.Users;
 using RepairSystem.Application.Interfaces.Auth;
+using System.Security.Claims;
 
 namespace RepairSystem.Api.Controllers;
 
@@ -148,6 +149,46 @@ public class AuthController : ControllerBase
             }),
 
             _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("users/{userId:int}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateUserStatus(
+    int userId,
+    [FromBody] UpdateUserStatusRequestDto request)
+    {
+        var adminIdValue = User.FindFirst(
+            ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(adminIdValue, out var adminId) || adminId <= 0)
+            return Unauthorized();
+
+        var result = await _authService.UpdateUserStatusAsync(
+            adminId,
+            userId,
+            request.IsActive!.Value);
+
+        return result switch
+        {
+            UserStatusUpdateResult.Updated => NoContent(),
+            UserStatusUpdateResult.AlreadyInRequestedState => NoContent(),
+
+            UserStatusUpdateResult.NotFound => NotFound(),
+
+            UserStatusUpdateResult.CannotDeactivateOwnAccount =>
+                Conflict(new { message = "You cannot deactivate your own account." }),
+
+            UserStatusUpdateResult.CannotDeactivateLastActiveAdmin =>
+                Conflict(new { message = "The last active Admin account cannot be deactivated." }),
+
+            _ => BadRequest()
         };
     }
 }

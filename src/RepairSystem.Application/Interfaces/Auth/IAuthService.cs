@@ -17,4 +17,9 @@ public interface IAuthService
     Task<UserUpdateResult> UpdateUserAsync(
     int userId,
     UpdateUserRequestDto request);
+
+    Task<UserStatusUpdateResult> UpdateUserStatusAsync(
+    int requestingAdminId,
+    int targetUserId,
+    bool isActive);
 }

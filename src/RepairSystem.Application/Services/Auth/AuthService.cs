@@ -183,4 +183,42 @@ public class AuthService : IAuthService
         return UserUpdateResult.Updated;
     }
 
+    public async Task<UserStatusUpdateResult> UpdateUserStatusAsync(
+    int requestingAdminId,
+    int targetUserId,
+    bool isActive)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(requestingAdminId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetUserId);
+
+        var targetUser = await _userRepository.GetByIdAsync(targetUserId);
+
+        if (targetUser is null)
+            return UserStatusUpdateResult.NotFound;
+
+        if (targetUser.IsActive == isActive)
+            return UserStatusUpdateResult.AlreadyInRequestedState;
+
+        if (!isActive)
+        {
+            if (requestingAdminId == targetUserId)
+                return UserStatusUpdateResult.CannotDeactivateOwnAccount;
+
+            if (targetUser.Role == UserRole.Admin)
+            {
+                var activeAdminCount =
+                    await _userRepository.CountActiveAdminsAsync();
+
+                if (activeAdminCount <= 1)
+                    return UserStatusUpdateResult.CannotDeactivateLastActiveAdmin;
+            }
+        }
+
+        targetUser.IsActive = isActive;
+
+        await _userRepository.UpdateAsync(targetUser);
+
+        return UserStatusUpdateResult.Updated;
+    }
+
 }

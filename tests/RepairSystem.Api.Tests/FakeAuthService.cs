@@ -25,6 +25,17 @@ public sealed class FakeAuthService : IAuthService
     public UserUpdateResult UpdateResult { get; set; }
         = UserUpdateResult.Updated;
 
+    public UserStatusUpdateResult StatusUpdateResult { get; set; }
+    = UserStatusUpdateResult.Updated;
+
+    public int StatusUpdateCallCount { get; private set; }
+
+    public int? LastStatusTargetUserId { get; private set; }
+
+    public int? LastStatusRequestingAdminId { get; private set; }
+
+    public bool? LastRequestedActiveStatus { get; private set; }
+
     public Task<bool> RegisterAsync(RegisterRequestDto request)
         => Task.FromResult(false);
 
@@ -56,5 +67,19 @@ public sealed class FakeAuthService : IAuthService
         LastUpdateRequest = request;
 
         return Task.FromResult(UpdateResult);
+    }
+
+
+    public Task<UserStatusUpdateResult> UpdateUserStatusAsync(
+        int requestingAdminId,
+        int targetUserId,
+        bool isActive)
+    {
+        StatusUpdateCallCount++;
+        LastStatusRequestingAdminId = requestingAdminId;
+        LastStatusTargetUserId = targetUserId;
+        LastRequestedActiveStatus = isActive;
+
+        return Task.FromResult(StatusUpdateResult);
     }
 }

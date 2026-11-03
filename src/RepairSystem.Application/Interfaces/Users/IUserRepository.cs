@@ -15,4 +15,6 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(int userId);
 
     Task UpdateAsync(User user);
+
+    Task<int> CountActiveAdminsAsync();
 }

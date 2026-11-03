@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Domain.Entities;
+using RepairSystem.Domain.Enums;
 using RepairSystem.Infrastructure.Data;
 
 namespace RepairSystem.Infrastructure.Repositories.Users;
@@ -53,6 +54,12 @@ public class UserRepository : IUserRepository
     public async Task UpdateAsync(User user)
     {
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<int> CountActiveAdminsAsync()
+    {
+        return await _context.Users.CountAsync(user =>
+            user.Role == UserRole.Admin && user.IsActive);
     }
 
 }

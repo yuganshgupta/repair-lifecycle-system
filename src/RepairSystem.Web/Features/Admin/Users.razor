@@ -153,14 +153,44 @@
                                 </td>
 
                                 <td class="text-end">
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-primary"
-                                            title="Edit user"
-                                            aria-label="@($"Edit {user.FullName}")"
-                                            @onclick="() => OpenEditForm(user)">
-                                        <span aria-hidden="true">✎</span>
-                                        Edit
-                                    </button>
+                                    <div class="d-inline-flex flex-wrap justify-content-end gap-2">
+
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                title="Edit user"
+                                                aria-label="@($"Edit {user.FullName}")"
+                                                disabled="@_isSubmitting"
+                                                @onclick="() => OpenEditForm(user)">
+                                            <span aria-hidden="true">✎</span>
+                                            Edit
+                                        </button>
+
+                                        @if (user.IsActive)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    title="Deactivate user"
+                                                    aria-label="@($"Deactivate {user.FullName}")"
+                                                    disabled="@_isSubmitting"
+                                                    @onclick="() => RequestStatusConfirmation(user, false)">
+                                                <span aria-hidden="true">⊖</span>
+                                                Deactivate
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-success"
+                                                    title="Activate user"
+                                                    aria-label="@($"Activate {user.FullName}")"
+                                                    disabled="@_isSubmitting"
+                                                    @onclick="() => RequestStatusConfirmation(user, true)">
+                                                <span aria-hidden="true">✓</span>
+                                                Activate
+                                            </button>
+                                        }
+
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -186,7 +216,7 @@
                         Title="@ConfirmationTitle"
                         Message="@ConfirmationMessage"
                         ConfirmButtonText="@ConfirmationButtonText"
-                        ConfirmButtonClass="btn-primary"
+                        ConfirmButtonClass="@ConfirmationButtonClass"
                         IsBusy="@_isSubmitting"
                         OnConfirm="ConfirmUserSaveAsync"
                         OnCancel="CancelConfirmation" />
@@ -206,6 +236,14 @@
 
     private int? _editingUserId;
 
+    private bool _isStatusChangeMode;
+
+    private int? _statusTargetUserId;
+
+    private string _statusTargetName = string.Empty;
+
+    private bool _requestedActiveStatus;
+
     private bool _isSubmitting;
     private bool _isError;
     private string? _message;
@@ -215,25 +253,41 @@
     private string? _usersError;
 
     private string ConfirmationTitle =>
-        _isEditMode
-            ? "Confirm user changes"
-            : "Confirm user creation";
+        _isStatusChangeMode
+            ? (_requestedActiveStatus
+                ? "Confirm account activation"
+                : "Confirm account deactivation")
+            : _isEditMode
+                ? "Confirm user changes"
+                : "Confirm user creation";
 
     private string ConfirmationButtonText =>
-        _isEditMode
-            ? "Save Changes"
-            : "Create User";
+        _isStatusChangeMode
+            ? (_requestedActiveStatus ? "Activate Account" : "Deactivate Account")
+            : _isEditMode
+                ? "Save Changes"
+                : "Create User";
+
+    private string ConfirmationButtonClass =>
+        _isStatusChangeMode
+            ? (_requestedActiveStatus ? "btn-success" : "btn-danger")
+            : "btn-primary";
 
     private string ConfirmationMessage =>
-        _isEditMode
-            ? $"Save changes to {_userForm.FullName} ({_userForm.Email})?"
-            : $"Create a {_userForm.Role} account for " +
-              $"{_userForm.FullName} ({_userForm.Email})?";
+        _isStatusChangeMode
+            ? (_requestedActiveStatus
+                ? $"Reactivate {_statusTargetName}'s account? They will be able to sign in again."
+                : $"Deactivate {_statusTargetName}'s account? They will no longer be able to sign in. Their repair history will be preserved.")
+            : _isEditMode
+                ? $"Save changes to {_userForm.FullName} ({_userForm.Email})?"
+                : $"Create a {_userForm.Role} account for " +
+                  $"{_userForm.FullName} ({_userForm.Email})?";
 
     private void OpenCreateForm()
     {
         _isEditMode = false;
         _editingUserId = null;
+        _isStatusChangeMode = false;
 
         _userForm = new UserFormModel
         {
@@ -252,6 +306,7 @@
     {
         _isEditMode = true;
         _editingUserId = user.UserId;
+        _isStatusChangeMode = false;
 
         _userForm = new UserFormModel
         {
@@ -276,6 +331,7 @@
 
         _isEditMode = false;
         _editingUserId = null;
+        _isStatusChangeMode = false;
     }
 
     private void RequestUserConfirmation(UserFormModel model)
@@ -287,14 +343,45 @@
         _isError = false;
     }
 
+    private void RequestStatusConfirmation(
+        AdminUserApiDto user,
+        bool activate)
+    {
+        _isStatusChangeMode = true;
+
+        _statusTargetUserId = user.UserId;
+        _statusTargetName = user.FullName;
+        _requestedActiveStatus = activate;
+
+        _showUserForm = false;
+        _showConfirmation = true;
+
+        _isEditMode = false;
+        _editingUserId = null;
+
+        _message = null;
+        _isError = false;
+    }
+
     private void CancelConfirmation()
     {
         _showConfirmation = false;
+
+        if (_isStatusChangeMode)
+        {
+            _isStatusChangeMode = false;
+            _statusTargetUserId = null;
+            _statusTargetName = string.Empty;
+        }
     }
 
     private async Task ConfirmUserSaveAsync()
     {
-        if (_isEditMode)
+        if (_isStatusChangeMode)
+        {
+            await UpdateUserStatusAsync();
+        }
+        else if (_isEditMode)
         {
             await UpdateUserAsync();
         }
@@ -573,6 +660,150 @@
         {
             ShowError(
                 "The API request timed out. Check the API and try again.");
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task UpdateUserStatusAsync()
+    {
+        if (_isSubmitting || _statusTargetUserId is not int userId)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _message = null;
+        _isError = false;
+
+        var requestedStatus = _requestedActiveStatus;
+
+        try
+        {
+            var authState =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated != true ||
+                !user.IsInRole("Admin"))
+            {
+                ShowError("Only an authenticated Admin can manage user accounts.");
+                return;
+            }
+
+            var sessionId = user
+                .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                !TokenStore.TryGet(sessionId, out var session) ||
+                session is null)
+            {
+                ShowError("Your session is unavailable. Please sign in again.");
+                return;
+            }
+
+            if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                ShowError("Your API token has expired. Please sign in again.");
+                return;
+            }
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Patch,
+                $"api/auth/users/{userId}/status")
+            {
+                Content = JsonContent.Create(
+                    new UpdateUserStatusApiRequest
+                    {
+                        IsActive = requestedStatus
+                    })
+            };
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    session.AccessToken);
+
+            using var response = await client.SendAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.NoContent)
+            {
+                _showConfirmation = false;
+                _isStatusChangeMode = false;
+                _statusTargetUserId = null;
+                _statusTargetName = string.Empty;
+
+                _message = requestedStatus
+                    ? "User account activated successfully."
+                    : "User account deactivated successfully.";
+
+                await LoadUsersAsync();
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Conflict)
+            {
+                var responseBody =
+                    await response.Content.ReadAsStringAsync();
+
+                try
+                {
+                    using var document = JsonDocument.Parse(responseBody);
+
+                    if (document.RootElement.TryGetProperty(
+                            "message", out var messageElement))
+                    {
+                        ShowError(
+                            messageElement.GetString() ??
+                            "This account status change is not allowed.");
+                        return;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Use the fallback message below.
+                }
+
+                ShowError(
+                    "This account status change is not allowed.");
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                ShowError("The user account could not be found.");
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                ShowError("Your API session has expired. Please sign in again.");
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                ShowError("Only Admins can change account status.");
+                return;
+            }
+
+            ShowError(
+                $"Could not change account status. API returned " +
+                $"{(int)response.StatusCode}.");
+        }
+        catch (HttpRequestException)
+        {
+            ShowError("Could not connect to the API. Make sure it is running.");
+        }
+        catch (TaskCanceledException)
+        {
+            ShowError("The API request timed out. Please try again.");
         }
         finally
         {
