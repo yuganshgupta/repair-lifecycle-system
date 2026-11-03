@@ -1,0 +1,429 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+<PageTitle>Repair Lifecycle System | Home</PageTitle>
+
+<div class="home-page">
+
+    <!-- Navigation -->
+    <header class="home-navbar">
+        <div class="container home-nav-inner">
+
+            <a href="/" class="home-brand">
+                <span class="home-brand-mark">RL</span>
+
+                <span class="home-brand-name">
+                    Repair Lifecycle
+                    <small>MANAGEMENT SYSTEM</small>
+                </span>
+            </a>
+
+            <nav class="home-nav-links">
+                <a href="#features">Features</a>
+                <a href="#workflow">How it works</a>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="/dashboard" class="home-nav-button">
+                            Dashboard <span aria-hidden="true">→</span>
+                        </a>
+                    </Authorized>
+
+                    <NotAuthorized>
+                        <a href="/login" class="home-nav-button">
+                            Sign in <span aria-hidden="true">→</span>
+                        </a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </nav>
+
+        </div>
+    </header>
+
+    <main>
+
+        <!-- Hero -->
+        <section class="home-hero">
+            <div class="container">
+                <div class="home-hero-grid">
+
+                    <div class="home-hero-content">
+
+                        <div class="home-eyebrow">
+                            <span class="home-eyebrow-dot"></span>
+                            REPAIR MANAGEMENT, MADE CLEAR
+                        </div>
+
+                        <h1>
+                            From repair request
+                            to <span>resolution.</span>
+                        </h1>
+
+                        <p class="home-hero-description">
+                            A centralized platform to submit repair requests,
+                            coordinate service work and keep every repair
+                            moving forward.
+                        </p>
+
+                        <div class="home-hero-actions">
+
+                            <AuthorizeView>
+                                <Authorized>
+                                    <a href="/dashboard"
+                                       class="home-primary-button">
+                                        Open dashboard
+                                        <span aria-hidden="true">→</span>
+                                    </a>
+                                </Authorized>
+
+                                <NotAuthorized>
+                                    <a href="/login"
+                                       class="home-primary-button">
+                                        Access your account
+                                        <span aria-hidden="true">→</span>
+                                    </a>
+                                </NotAuthorized>
+                            </AuthorizeView>
+
+                            <a href="#workflow"
+                               class="home-secondary-button">
+                                Explore the workflow
+                            </a>
+
+                        </div>
+
+                        <p class="home-hero-note">
+                            <span aria-hidden="true">✓</span>
+                            Role-based access for Customers, Technicians
+                            and Administrators.
+                        </p>
+
+                    </div>
+
+                    <!-- Decorative lifecycle visual -->
+                    <div class="home-visual">
+
+                        <div class="home-visual-card">
+
+                            <div class="home-visual-header">
+                                <div>
+                                    <span class="home-visual-overline">
+                                        THE REPAIR JOURNEY
+                                    </span>
+                                    <h2>One connected process.</h2>
+                                </div>
+
+                                <span class="home-visual-tag">
+                                    LIFECYCLE
+                                </span>
+                            </div>
+
+                            <div class="home-process">
+
+                                <div class="home-process-item">
+                                    <div class="home-process-icon">
+                                        01
+                                    </div>
+
+                                    <div>
+                                        <h3>Request submitted</h3>
+                                        <p>
+                                            A customer reports a device issue
+                                            and provides its details.
+                                        </p>
+                                    </div>
+
+                                    <span class="home-process-status home-status-intake">
+                                        INTAKE
+                                    </span>
+                                </div>
+
+                                <div class="home-process-connector"></div>
+
+                                <div class="home-process-item">
+                                    <div class="home-process-icon">
+                                        02
+                                    </div>
+
+                                    <div>
+                                        <h3>Repair coordinated</h3>
+                                        <p>
+                                            Repair work is assigned and
+                                            its progress is managed.
+                                        </p>
+                                    </div>
+
+                                    <span class="home-process-status home-status-service">
+                                        SERVICE
+                                    </span>
+                                </div>
+
+                                <div class="home-process-connector"></div>
+
+                                <div class="home-process-item">
+                                    <div class="home-process-icon">
+                                        03
+                                    </div>
+
+                                    <div>
+                                        <h3>Resolution tracked</h3>
+                                        <p>
+                                            The repair journey moves towards
+                                            completion.
+                                        </p>
+                                    </div>
+
+                                    <span class="home-process-status home-status-complete">
+                                        COMPLETE
+                                    </span>
+                                </div>
+
+                            </div>
+
+                            <div class="home-visual-footer">
+                                <span class="home-footer-indicator"></span>
+                                A clearer view of the entire repair lifecycle
+                            </div>
+
+                        </div>
+
+                        <div class="home-visual-decoration"></div>
+
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section id="features" class="home-features">
+            <div class="container">
+
+                <div class="home-section-heading">
+                    <span class="home-section-label">THE PLATFORM</span>
+
+                    <h2>
+                        Everything organized.
+                        <span>One system.</span>
+                    </h2>
+
+                    <p>
+                        Bring customers, technicians and administrators
+                        together through a structured repair-management
+                        workflow.
+                    </p>
+                </div>
+
+                <div class="row g-4">
+
+                    <div class="col-md-4">
+                        <article class="home-feature-card">
+                            <div class="home-feature-icon home-icon-blue">
+                                <span>01</span>
+                            </div>
+
+                            <h3>Repair Requests</h3>
+
+                            <p>
+                                Record device information, describe technical
+                                issues and submit repair requests.
+                            </p>
+
+                            <AuthorizeView>
+                                <Authorized>
+                                    <a href="/dashboard">
+                                        Customer access <span aria-hidden="true">→</span>
+                                    </a>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <a href="/login">
+                                        Customer access <span aria-hidden="true">→</span>
+                                    </a>
+                                </NotAuthorized>
+                            </AuthorizeView>
+                        </article>
+                    </div>
+
+                    <div class="col-md-4">
+                        <article class="home-feature-card">
+                            <div class="home-feature-icon home-icon-purple">
+                                <span>02</span>
+                            </div>
+
+                            <h3>Repair Coordination</h3>
+
+                            <p>
+                                Organize assigned repair work and provide
+                                visibility into the repair process.
+                            </p>
+
+                            <AuthorizeView>
+                                <Authorized>
+                                    <a href="/dashboard">
+                                        Technician access <span aria-hidden="true">→</span>
+                                    </a>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <a href="/login">
+                                        Technician access <span aria-hidden="true">→</span>
+                                    </a>
+                                </NotAuthorized>
+                            </AuthorizeView>
+                        </article>
+                    </div>
+
+                    <div class="col-md-4">
+                        <article class="home-feature-card">
+                            <div class="home-feature-icon home-icon-green">
+                                <span>03</span>
+                            </div>
+
+                            <h3>User Management</h3>
+
+                            <p>
+                                Manage customer, technician and administrator
+                                accounts with role-based permissions.
+                            </p>
+
+                            <AuthorizeView Roles="Admin">
+                                <Authorized>
+                                    <a href="/admin/users">
+                                        Administrator access <span aria-hidden="true">→</span>
+                                    </a>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <a href="/login">
+                                        Administrator access <span aria-hidden="true">→</span>
+                                    </a>
+                                </NotAuthorized>
+                            </AuthorizeView>
+                        </article>
+                    </div>
+
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Workflow -->
+        <section id="workflow" class="home-workflow">
+            <div class="container">
+
+                <div class="home-workflow-heading">
+                    <span class="home-section-label">
+                        HOW IT WORKS
+                    </span>
+
+                    <h2>
+                        A structured journey.
+                        <span>From start to finish.</span>
+                    </h2>
+                </div>
+
+                <div class="row g-4">
+
+                    <div class="col-md-4">
+                        <div class="home-workflow-step">
+                            <span class="home-step-number">01</span>
+                            <h3>Submit</h3>
+                            <p>
+                                Register a repair request with the device
+                                details and reported problem.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="home-workflow-step">
+                            <span class="home-step-number">02</span>
+                            <h3>Coordinate</h3>
+                            <p>
+                                Organize the repair process and coordinate
+                                work between the responsible users.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="home-workflow-step">
+                            <span class="home-step-number">03</span>
+                            <h3>Resolve</h3>
+                            <p>
+                                Follow the repair status through to its
+                                final resolution.
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Final call to action -->
+        <section class="home-cta">
+            <div class="container">
+
+                <div class="home-cta-content">
+                    <div>
+                        <span class="home-section-label">
+                            REPAIR LIFECYCLE SYSTEM
+                        </span>
+
+                        <h2>
+                            Ready to get started?
+                        </h2>
+
+                        <p>
+                            Sign in to access your account and continue
+                            managing your repair workflow.
+                        </p>
+                    </div>
+
+                    <AuthorizeView>
+                        <Authorized>
+                            <a href="/dashboard"
+                               class="home-primary-button">
+                                Go to dashboard <span aria-hidden="true">→</span>
+                            </a>
+                        </Authorized>
+
+                        <NotAuthorized>
+                            <a href="/login"
+                               class="home-primary-button">
+                                Sign in to continue <span aria-hidden="true">→</span>
+                            </a>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="home-footer">
+        <div class="container home-footer-inner">
+
+            <a href="/" class="home-brand">
+                <span class="home-brand-mark">RL</span>
+
+                <span class="home-brand-name">
+                    Repair Lifecycle
+                    <small>MANAGEMENT SYSTEM</small>
+                </span>
+            </a>
+
+            <p>
+                A centralized approach to repair management.
+            </p>
+
+            <span class="home-copyright">
+                © @DateTime.UtcNow.Year Repair Lifecycle System
+            </span>
+
+        </div>
+    </footer>
+
+</div>
