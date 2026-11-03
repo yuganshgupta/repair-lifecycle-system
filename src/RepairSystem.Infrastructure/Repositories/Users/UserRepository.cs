@@ -36,4 +36,23 @@ public class UserRepository : IUserRepository
             .SingleOrDefaultAsync(user => user.Email == email);
     }
 
+    public async Task<IReadOnlyList<User>> GetAllAsync()
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .OrderBy(user => user.FullName)
+            .ToListAsync();
+    }
+
+    public async Task<User?> GetByIdAsync(int userId)
+    {
+        return await _context.Users
+            .SingleOrDefaultAsync(user => user.UserId == userId);
+    }
+
+    public async Task UpdateAsync(User user)
+    {
+        await _context.SaveChangesAsync();
+    }
+
 }

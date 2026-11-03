@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using RepairSystem.Application.Contracts.Auth;
+using RepairSystem.Application.Contracts.Users;
+using RepairSystem.Application.Interfaces.Auth;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Domain.Entities;
-using RepairSystem.Application.Contracts.Auth;
-using RepairSystem.Application.Interfaces.Auth;
 using RepairSystem.Domain.Enums;
 
 namespace RepairSystem.Application.Services.Auth;
@@ -120,6 +121,66 @@ public class AuthService : IAuthService
         return true;
     }
 
+    public async Task<IReadOnlyList<AdminUserDto>> GetUsersAsync()
+    {
+        var users = await _userRepository.GetAllAsync();
 
+        return users.Select(user => new AdminUserDto
+        {
+            UserId = user.UserId,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role.ToString(),
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt
+        }).ToList();
+    }
+
+    public async Task<UserUpdateResult> UpdateUserAsync(
+    int userId,
+    UpdateUserRequestDto request)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var role = request.Role switch
+        {
+            nameof(UserRole.Customer) => UserRole.Customer,
+            nameof(UserRole.Technician) => UserRole.Technician,
+            nameof(UserRole.Admin) => UserRole.Admin,
+            _ => (UserRole?)null
+        };
+
+        if (role is null)
+        {
+            return UserUpdateResult.InvalidRole;
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user is null)
+        {
+            return UserUpdateResult.NotFound;
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var existingUser =
+            await _userRepository.FindByEmailAsync(email);
+
+        if (existingUser is not null &&
+            existingUser.UserId != userId)
+        {
+            return UserUpdateResult.EmailAlreadyExists;
+        }
+
+        user.FullName = request.FullName.Trim();
+        user.Email = email;
+        user.Role = role.Value;
+
+        await _userRepository.UpdateAsync(user);
+
+        return UserUpdateResult.Updated;
+    }
 
 }

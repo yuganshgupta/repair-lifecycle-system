@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RepairSystem.Api.Security;
 using RepairSystem.Application.Contracts.Auth;
+using RepairSystem.Application.Contracts.Users;
 using RepairSystem.Application.Interfaces.Auth;
 
 namespace RepairSystem.Api.Controllers;
@@ -99,4 +100,54 @@ public class AuthController : ControllerBase
 			}
 		});
 	}
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet("users")]
+    public async Task<ActionResult<IReadOnlyList<AdminUserDto>>> GetUsers()
+    {
+        var users = await _authService.GetUsersAsync();
+
+        return Ok(users);
+    }
+
+
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin")]
+    [HttpPut("users/{userId:int}")]
+    public async Task<IActionResult> UpdateUser(
+    int userId,
+    [FromBody] UpdateUserRequestDto request)
+    {
+        var result = await _authService.UpdateUserAsync(
+            userId,
+            request);
+
+        return result switch
+        {
+            UserUpdateResult.Updated => NoContent(),
+
+            UserUpdateResult.NotFound => NotFound(new
+            {
+                message = "User account was not found."
+            }),
+
+            UserUpdateResult.EmailAlreadyExists => Conflict(new
+            {
+                message = "Another account already uses this email address."
+            }),
+
+            UserUpdateResult.InvalidRole => BadRequest(new
+            {
+                message = "The requested role is invalid."
+            }),
+
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
+    }
 }

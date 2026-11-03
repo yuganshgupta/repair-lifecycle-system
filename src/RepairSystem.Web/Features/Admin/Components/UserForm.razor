@@ -1,0 +1,146 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using RepairSystem.Web.Features.Admin.Contracts
+
+<section class="card mb-4">
+
+    <div class="card-header bg-white py-3">
+        <h2 class="h5 mb-0">
+            @(IsCreate ? "Create User" : "Edit User")
+        </h2>
+    </div>
+
+    <div class="card-body">
+
+        <EditForm Model="@Model"
+                  OnValidSubmit="HandleValidSubmit">
+
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="row g-3">
+
+                <div class="col-md-6">
+                    <label class="form-label" for="userFullName">
+                        Full Name
+                    </label>
+
+                    <InputText id="userFullName"
+                               class="form-control"
+                               autocomplete="name"
+                               @bind-Value="Model.FullName" />
+
+                    <ValidationMessage For="@(() => Model.FullName)" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="userEmail">
+                        Email Address
+                    </label>
+
+                    <InputText id="userEmail"
+                               class="form-control"
+                               type="email"
+                               autocomplete="email"
+                               @bind-Value="Model.Email" />
+
+                    <ValidationMessage For="@(() => Model.Email)" />
+                </div>
+
+                @if (IsCreate)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label" for="userPassword">
+                            Temporary Password
+                        </label>
+
+                        <InputText id="userPassword"
+                                   class="form-control"
+                                   type="password"
+                                   autocomplete="new-password"
+                                   @bind-Value="Model.Password" />
+
+                        <ValidationMessage For="@(() => Model.Password)" />
+                    </div>
+                }
+
+                <div class="col-md-6">
+                    <label class="form-label" for="userRole">
+                        Role
+                    </label>
+
+                    <InputSelect id="userRole"
+                                 class="form-select"
+                                 @bind-Value="Model.Role">
+
+                        <option value="Customer">Customer</option>
+                        <option value="Technician">Technician</option>
+                        <option value="Admin">Admin</option>
+
+                    </InputSelect>
+
+                    <ValidationMessage For="@(() => Model.Role)" />
+                </div>
+
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+
+                <button type="submit"
+                        class="btn btn-primary"
+                        disabled="@IsSubmitting">
+
+                    @if (IsSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>@SubmitButtonText</span>
+                    }
+
+                </button>
+
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        disabled="@IsSubmitting"
+                        @onclick="OnCancel">
+                    Cancel
+                </button>
+
+            </div>
+
+        </EditForm>
+
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public UserFormModel Model { get; set; } = new();
+
+    [Parameter]
+    public bool IsCreate { get; set; } = true;
+
+    [Parameter]
+    public bool IsSubmitting { get; set; }
+
+    [Parameter]
+    public EventCallback<UserFormModel> OnValidSubmit { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string SubmitButtonText =>
+        IsCreate ? "Create User" : "Save Changes";
+
+    protected override void OnParametersSet()
+    {
+        Model.IsCreate = IsCreate;
+    }
+
+    private Task HandleValidSubmit()
+    {
+        return OnValidSubmit.InvokeAsync(Model);
+    }
+}

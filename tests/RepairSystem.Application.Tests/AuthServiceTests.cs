@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RepairSystem.Application.Contracts.Auth;
-using RepairSystem.Application.Services.Auth;
 using RepairSystem.Application.Interfaces.Users;
+using RepairSystem.Application.Services.Auth;
 using RepairSystem.Domain.Entities;
 using RepairSystem.Domain.Enums;
 
@@ -50,8 +50,8 @@ public sealed class AuthServiceTests
         var result = await authService.RegisterAsync(request);
         Assert.IsTrue(result);
         Assert.IsNotNull(u1.AddedUser);
-        Assert.AreNotEqual(request.Password,u1.AddedUser.PasswordHash);
-        Assert.AreEqual(UserRole.Customer,u1.AddedUser.Role);
+        Assert.AreNotEqual(request.Password, u1.AddedUser.PasswordHash);
+        Assert.AreEqual(UserRole.Customer, u1.AddedUser.Role);
     }
 
     [TestMethod]
@@ -68,7 +68,7 @@ public sealed class AuthServiceTests
             Role = UserRole.Customer
         };
 
-        user.PasswordHash = passwordHasher.HashPassword(user,"test1234");
+        user.PasswordHash = passwordHasher.HashPassword(user, "test1234");
         u1.UserToFind = user;
 
         var authService = new AuthService(u1, passwordHasher);
@@ -85,7 +85,6 @@ public sealed class AuthServiceTests
         Assert.AreEqual("Test", result.FullName);
         Assert.AreEqual(UserRole.Customer, result.Role);
     }
-
 
     [TestMethod]
     public async Task LoginAsync_ReturnsNull_WhenPasswordIsIncorrect()
@@ -165,7 +164,6 @@ public sealed class AuthServiceTests
         Assert.IsNull(result);
     }
 
-
     [TestMethod]
     public async Task CreateUserAsync_CreatesTechnician_WhenRequestIsValid()
     {
@@ -243,7 +241,6 @@ public sealed class AuthServiceTests
         Assert.IsNull(repository.AddedUser);
     }
 
-
     private sealed class FakeUserRepository : IUserRepository
     {
         public User? UserToFind { get; set; }
@@ -251,6 +248,10 @@ public sealed class AuthServiceTests
         public bool EmailExists { get; set; }
 
         public User? AddedUser { get; private set; }
+
+        public User? UserToFindById { get; set; }
+
+        public User? UpdatedUser { get; private set; }
 
         public Task<bool> EmailExistsAsync(string email)
         {
@@ -266,6 +267,28 @@ public sealed class AuthServiceTests
         public Task<User?> FindByEmailAsync(string email)
         {
             return Task.FromResult(UserToFind);
+        }
+
+        public Task<IReadOnlyList<User>> GetAllAsync()
+        {
+            return Task.FromResult<IReadOnlyList<User>>(
+                Array.Empty<User>());
+        }
+
+        public Task<User?> GetByIdAsync(int userId)
+        {
+            var user = UserToFindById?.UserId == userId
+                ? UserToFindById
+                : null;
+
+            return Task.FromResult(user);
+        }
+
+        public Task UpdateAsync(User user)
+        {
+            UpdatedUser = user;
+
+            return Task.CompletedTask;
         }
     }
 }
