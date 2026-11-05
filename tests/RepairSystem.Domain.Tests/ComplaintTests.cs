@@ -61,4 +61,35 @@ public class ComplaintTests
         Assert.ThrowsExactly<InvalidOperationException>(() => complaint.ChangeStatus(ComplaintStatus.Cancelled));
     }
 
+    [TestMethod]
+    public void AssignToTechnician_WhenComplaintIsSubmitted_SetsTechnicianAndStatus()
+    {
+        var complaint = new Complaint();
+
+        complaint.AssignToTechnician(10);
+
+        Assert.AreEqual(10, complaint.AssignedTechnicianId);
+        Assert.AreEqual(ComplaintStatus.Assigned, complaint.Status);
+    }
+
+    [TestMethod]
+    public void AssignToTechnician_Throws_WhenComplaintIsAlreadyAssigned()
+    {
+        var complaint = new Complaint();
+
+        complaint.AssignToTechnician(10);
+
+        Assert.ThrowsExactly<InvalidOperationException>(
+            () => complaint.AssignToTechnician(20));
+    }
+
+    [TestMethod]
+    public void AssignToTechnician_Throws_WhenTechnicianIdIsInvalid()
+    {
+        var complaint = new Complaint();
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => complaint.AssignToTechnician(0));
+    }
+
 }

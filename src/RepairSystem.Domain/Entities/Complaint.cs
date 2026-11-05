@@ -25,6 +25,29 @@ public class Complaint
     public ComplaintStatus Status { get; set; } =
         ComplaintStatus.Submitted;
 
+    public void AssignToTechnician(int technicianId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(technicianId);
+
+        if (Status != ComplaintStatus.Submitted)
+        {
+            throw new InvalidOperationException(
+                "Only submitted complaints can be assigned.");
+        }
+
+        if (AssignedTechnicianId.HasValue)
+        {
+            throw new InvalidOperationException(
+                "This complaint is already assigned to a technician.");
+        }
+
+        AssignedTechnicianId = technicianId;
+
+        ChangeStatus(ComplaintStatus.Assigned);
+
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void ChangeStatus(ComplaintStatus newStatus)
     {
         if(Status == ComplaintStatus.Submitted && newStatus == ComplaintStatus.Completed)

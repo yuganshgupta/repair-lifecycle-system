@@ -12,7 +12,10 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IApiTokenSessionStore TokenStore
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
+<MudProviders />
 <PageTitle>Manage Users</PageTitle>
 
 <div class="container mt-4 mb-5">
@@ -41,14 +44,6 @@
         </div>
 
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(_message))
-    {
-        <div class="alert @(_isError ? "alert-danger" : "alert-success")"
-             role="alert">
-            @_message
-        </div>
-    }
 
     <section class="card mb-4">
 
@@ -103,101 +98,110 @@
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
 
-                    <thead class="table-light">
-                        <tr>
-                            <th>User Name</th>
-                            <th>Email Address</th>
-                            <th>Role</th>
-                            <th>Account Status</th>
-                            <th>Created On</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
+            <MudTable T="AdminUserApiDto"
+                      Items="@_users"
+                      Hover="true"
+                      Striped="true"
+                      Dense="true"
+                      Breakpoint="Breakpoint.Sm">
 
-                    <tbody>
-                        @foreach (var user in _users)
+                <HeaderContent>
+                    <MudTh>User Name</MudTh>
+                    <MudTh>Email Address</MudTh>
+                    <MudTh>Role</MudTh>
+                    <MudTh>Account Status</MudTh>
+                    <MudTh>Created On</MudTh>
+                    <MudTh Class="text-end">Actions</MudTh>
+                </HeaderContent>
+
+                <RowTemplate Context="user">
+
+                    <MudTd DataLabel="User Name">
+                        <strong>@user.FullName</strong>
+                    </MudTd>
+
+                    <MudTd DataLabel="Email Address">
+                        @user.Email
+                    </MudTd>
+
+                    <MudTd DataLabel="Role">
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="Color.Default"
+                                 Variant="Variant.Outlined">
+                            @user.Role
+                        </MudChip>
+                    </MudTd>
+
+                    <MudTd DataLabel="Account Status">
+                        @if (user.IsActive)
                         {
-                            <tr>
-                                <td>
-                                    <strong>@user.FullName</strong>
-                                </td>
-
-                                <td>@user.Email</td>
-
-                                <td>
-                                    <span class="badge bg-secondary">
-                                        @user.Role
-                                    </span>
-                                </td>
-
-                                <td>
-                                    @if (user.IsActive)
-                                    {
-                                        <span class="badge bg-success">
-                                            Active
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-danger">
-                                            Inactive
-                                        </span>
-                                    }
-                                </td>
-
-                                <td>
-                                    @(user.CreatedAt.ToLocalTime().ToString("dd MMM yyyy"))
-                                </td>
-
-                                <td class="text-end">
-                                    <div class="d-inline-flex flex-wrap justify-content-end gap-2">
-
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-primary"
-                                                title="Edit user"
-                                                aria-label="@($"Edit {user.FullName}")"
-                                                disabled="@_isSubmitting"
-                                                @onclick="() => OpenEditForm(user)">
-                                            <span aria-hidden="true">✎</span>
-                                            Edit
-                                        </button>
-
-                                        @if (user.IsActive)
-                                        {
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-danger"
-                                                    title="Deactivate user"
-                                                    aria-label="@($"Deactivate {user.FullName}")"
-                                                    disabled="@_isSubmitting"
-                                                    @onclick="() => RequestStatusConfirmation(user, false)">
-                                                <span aria-hidden="true">⊖</span>
-                                                Deactivate
-                                            </button>
-                                        }
-                                        else
-                                        {
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-success"
-                                                    title="Activate user"
-                                                    aria-label="@($"Activate {user.FullName}")"
-                                                    disabled="@_isSubmitting"
-                                                    @onclick="() => RequestStatusConfirmation(user, true)">
-                                                <span aria-hidden="true">✓</span>
-                                                Activate
-                                            </button>
-                                        }
-
-                                    </div>
-                                </td>
-                            </tr>
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="Color.Success">
+                                Active
+                            </MudChip>
                         }
-                    </tbody>
+                        else
+                        {
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="Color.Error">
+                                Inactive
+                            </MudChip>
+                        }
+                    </MudTd>
 
-                </table>
-            </div>
+                    <MudTd DataLabel="Created On">
+                        @(user.CreatedAt.ToLocalTime().ToString("dd MMM yyyy"))
+                    </MudTd>
+
+                    <MudTd DataLabel="Actions" Class="text-end">
+                        <div class="d-inline-flex flex-wrap justify-content-end gap-2">
+
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       title="Edit user"
+                                       aria-label="@($"Edit {user.FullName}")"
+                                       Disabled="@_isSubmitting"
+                                       OnClick="@(() => OpenEditForm(user))">
+                                Edit
+                            </MudButton>
+
+                            @if (user.IsActive)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           title="Deactivate user"
+                                           aria-label="@($"Deactivate {user.FullName}")"
+                                           Disabled="@_isSubmitting"
+                                           OnClick="@(() => RequestStatusConfirmation(user, false))">
+                                    Deactivate
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           title="Activate user"
+                                           aria-label="@($"Activate {user.FullName}")"
+                                           Disabled="@_isSubmitting"
+                                           OnClick="@(() => RequestStatusConfirmation(user, true))">
+                                    Activate
+                                </MudButton>
+                            }
+
+                        </div>
+                    </MudTd>
+
+                </RowTemplate>
+
+            </MudTable>
+
         }
 
     </section>
@@ -211,15 +215,6 @@
                   OnValidSubmit="RequestUserConfirmation"
                   OnCancel="CancelUserForm" />
     }
-
-    <ConfirmationDialog IsVisible="@_showConfirmation"
-                        Title="@ConfirmationTitle"
-                        Message="@ConfirmationMessage"
-                        ConfirmButtonText="@ConfirmationButtonText"
-                        ConfirmButtonClass="@ConfirmationButtonClass"
-                        IsBusy="@_isSubmitting"
-                        OnConfirm="ConfirmUserSaveAsync"
-                        OnCancel="CancelConfirmation" />
 </div>
 
 @code {
@@ -229,8 +224,6 @@
     };
 
     private bool _showUserForm;
-
-    private bool _showConfirmation;
 
     private bool _isEditMode;
 
@@ -245,8 +238,6 @@
     private bool _requestedActiveStatus;
 
     private bool _isSubmitting;
-    private bool _isError;
-    private string? _message;
     private IReadOnlyList<AdminUserApiDto> _users =
         Array.Empty<AdminUserApiDto>();
     private bool _isLoadingUsers = true;
@@ -268,10 +259,10 @@
                 ? "Save Changes"
                 : "Create User";
 
-    private string ConfirmationButtonClass =>
+    private Color ConfirmationButtonColor =>
         _isStatusChangeMode
-            ? (_requestedActiveStatus ? "btn-success" : "btn-danger")
-            : "btn-primary";
+            ? (_requestedActiveStatus ? Color.Success : Color.Error)
+            : Color.Primary;
 
     private string ConfirmationMessage =>
         _isStatusChangeMode
@@ -296,10 +287,7 @@
         };
 
         _showUserForm = true;
-        _showConfirmation = false;
 
-        _message = null;
-        _isError = false;
     }
 
     private void OpenEditForm(AdminUserApiDto user)
@@ -317,33 +305,63 @@
             IsCreate = false
         };
 
-        _showUserForm = true;
-        _showConfirmation = false;
-
-        _message = null;
-        _isError = false;
+        _showUserForm = true; 
     }
 
     private void CancelUserForm()
     {
         _showUserForm = false;
-        _showConfirmation = false;
 
         _isEditMode = false;
         _editingUserId = null;
         _isStatusChangeMode = false;
     }
 
-    private void RequestUserConfirmation(UserFormModel model)
+    private async Task ShowConfirmationDialogAsync()
     {
-        _userForm = model;
-        _showConfirmation = true;
+        var parameters = new DialogParameters<ConfirmationDialog>
+        {
+            { x => x.Message, ConfirmationMessage },
+            { x => x.ConfirmButtonText, ConfirmationButtonText },
+            { x => x.ConfirmButtonColor, ConfirmationButtonColor },
+            {
+                x => x.OnConfirm,
+                EventCallback.Factory.Create(this, ConfirmUserSaveAsync)
+            }
+        };
 
-        _message = null;
-        _isError = false;
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialogReference =
+            await DialogService.ShowAsync<ConfirmationDialog>(
+                ConfirmationTitle,
+                parameters,
+                options);
+
+        await dialogReference.Result;
+
+        // Clean up status-change state if the dialog was
+        // cancelled or the status operation failed.
+        if (_isStatusChangeMode)
+        {
+            CancelConfirmation();
+        }
     }
 
-    private void RequestStatusConfirmation(
+    private async Task RequestUserConfirmation(UserFormModel model)
+    {
+        _userForm = model;
+        _isStatusChangeMode = false; 
+
+        await ShowConfirmationDialogAsync();
+    }
+
+    private async Task RequestStatusConfirmation(
         AdminUserApiDto user,
         bool activate)
     {
@@ -354,25 +372,18 @@
         _requestedActiveStatus = activate;
 
         _showUserForm = false;
-        _showConfirmation = true;
 
         _isEditMode = false;
         _editingUserId = null;
 
-        _message = null;
-        _isError = false;
+        await ShowConfirmationDialogAsync();
     }
 
     private void CancelConfirmation()
     {
-        _showConfirmation = false;
-
-        if (_isStatusChangeMode)
-        {
-            _isStatusChangeMode = false;
-            _statusTargetUserId = null;
-            _statusTargetName = string.Empty;
-        }
+        _isStatusChangeMode = false;
+        _statusTargetUserId = null;
+        _statusTargetName = string.Empty;
     }
 
     private async Task ConfirmUserSaveAsync()
@@ -399,8 +410,6 @@
         }
 
         _isSubmitting = true;
-        _message = null;
-        _isError = false;
 
         try
         {
@@ -466,7 +475,6 @@
             {
                 var createdRole = _userForm.Role;
 
-                _showConfirmation = false;
                 _showUserForm = false;
 
                 _userForm = new UserFormModel
@@ -474,7 +482,9 @@
                     IsCreate = true
                 };
 
-                _message = $"{createdRole} account created successfully.";
+                Snackbar.Add(
+                $"{createdRole} account created successfully.",
+                Severity.Success);
 
                 await LoadUsersAsync();
 
@@ -531,8 +541,6 @@
         }
 
         _isSubmitting = true;
-        _message = null;
-        _isError = false;
 
         try
         {
@@ -595,7 +603,6 @@
 
             if (response.StatusCode == HttpStatusCode.NoContent)
             {
-                _showConfirmation = false;
                 _showUserForm = false;
 
                 _isEditMode = false;
@@ -606,7 +613,9 @@
                     IsCreate = true
                 };
 
-                _message = "User account updated successfully.";
+                Snackbar.Add(
+                "User account updated successfully.",
+                Severity.Success);
 
                 await LoadUsersAsync();
 
@@ -675,8 +684,6 @@
         }
 
         _isSubmitting = true;
-        _message = null;
-        _isError = false;
 
         var requestedStatus = _requestedActiveStatus;
 
@@ -734,14 +741,15 @@
 
             if (response.StatusCode == HttpStatusCode.NoContent)
             {
-                _showConfirmation = false;
                 _isStatusChangeMode = false;
                 _statusTargetUserId = null;
                 _statusTargetName = string.Empty;
 
-                _message = requestedStatus
-                    ? "User account activated successfully."
-                    : "User account deactivated successfully.";
+                Snackbar.Add(
+            requestedStatus
+                ? "User account activated successfully."
+                : "User account deactivated successfully.",
+            Severity.Success);
 
                 await LoadUsersAsync();
                 return;
@@ -813,10 +821,7 @@
 
     private void ShowError(string message)
     {
-        _message = message;
-        _isError = true;
-
-        _showConfirmation = false;
+        Snackbar.Add(message, Severity.Error);
     }
 
     protected override async Task OnInitializedAsync()

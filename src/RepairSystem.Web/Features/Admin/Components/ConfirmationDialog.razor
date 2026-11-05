@@ -1,90 +1,88 @@
-﻿@if (IsVisible)
-{
-    <div class="modal-backdrop fade show"></div>
+﻿
+<MudDialog>
 
-    <div class="modal fade show d-block"
-         tabindex="-1"
-         role="dialog"
-         aria-modal="true"
-         aria-labelledby="confirmationTitle">
+    <DialogContent>
+        <MudText Typo="Typo.body1">
+            @Message
+        </MudText>
+    </DialogContent>
 
-        <div class="modal-dialog modal-dialog-centered">
+    <DialogActions>
 
-            <div class="modal-content">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Disabled="@_isBusy"
+                   OnClick="Cancel">
+            Cancel
+        </MudButton>
 
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmationTitle">
-                        @Title
-                    </h5>
+        <MudButton Variant="Variant.Filled"
+                   Color="@ConfirmButtonColor"
+                   Disabled="@_isBusy"
+                   OnClick="ConfirmAsync">
 
-                    <button type="button"
-                            class="btn-close"
-                            aria-label="Close"
-                            disabled="@IsBusy"
-                            @onclick="OnCancel">
-                    </button>
-                </div>
+            @if (_isBusy)
+            {
+                <MudProgressCircular Indeterminate="true"
+                                     Size="Size.Small"
+                                     Class="me-2" />
+                <span>Processing...</span>
+            }
+            else
+            {
+                @ConfirmButtonText
+            }
 
-                <div class="modal-body">
-                    @Message
-                </div>
+        </MudButton>
 
-                <div class="modal-footer">
+    </DialogActions>
 
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            disabled="@IsBusy"
-                            @onclick="OnCancel">
-                        Cancel
-                    </button>
-
-                    <button type="button"
-                            class="@($"btn {ConfirmButtonClass}")"
-                            disabled="@IsBusy"
-                            @onclick="OnConfirm">
-
-                        @if (IsBusy)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                            <span>Processing...</span>
-                        }
-                        else
-                        {
-                            @ConfirmButtonText
-                        }
-
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
-    </div>
-}
+</MudDialog>
 
 @code {
-    [Parameter]
-    public bool IsVisible { get; set; }
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    [Parameter]
-    public string Title { get; set; } = "Confirmation";
-
-    [Parameter]
+    [Parameter, EditorRequired]
     public string Message { get; set; } = string.Empty;
 
     [Parameter]
     public string ConfirmButtonText { get; set; } = "Confirm";
 
     [Parameter]
-    public string ConfirmButtonClass { get; set; } = "btn-primary";
-
-    [Parameter]
-    public bool IsBusy { get; set; }
+    public Color ConfirmButtonColor { get; set; } = Color.Primary;
 
     [Parameter]
     public EventCallback OnConfirm { get; set; }
 
-    [Parameter]
-    public EventCallback OnCancel { get; set; }
+    private bool _isBusy;
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await OnConfirm.InvokeAsync();
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            _isBusy = false;
+            await InvokeAsync(StateHasChanged);
+            throw;
+        }
+    }
 }

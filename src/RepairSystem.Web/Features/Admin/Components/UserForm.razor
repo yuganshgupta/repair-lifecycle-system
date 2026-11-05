@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using RepairSystem.Web.Features.Admin.Contracts
+@using System.Collections.Generic
 
 <section class="card mb-4">
 
@@ -20,93 +21,97 @@
             <div class="row g-3">
 
                 <div class="col-md-6">
-                    <label class="form-label" for="userFullName">
-                        Full Name
-                    </label>
-
-                    <InputText id="userFullName"
-                               class="form-control"
-                               autocomplete="name"
-                               @bind-Value="Model.FullName" />
-
-                    <ValidationMessage For="@(() => Model.FullName)" />
+                    <MudTextField T="string"
+                                  Label="Full Name"
+                                  @bind-Value="Model.FullName"
+                                  For="@(() => Model.FullName)"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true"
+                                  UserAttributes="@FullNameAttributes" />
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label" for="userEmail">
-                        Email Address
-                    </label>
-
-                    <InputText id="userEmail"
-                               class="form-control"
-                               type="email"
-                               autocomplete="email"
-                               @bind-Value="Model.Email" />
-
-                    <ValidationMessage For="@(() => Model.Email)" />
+                    <MudTextField T="string"
+                                  Label="Email Address"
+                                  @bind-Value="Model.Email"
+                                  For="@(() => Model.Email)"
+                                  InputType="InputType.Email"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true"
+                                  UserAttributes="@EmailAttributes" />
                 </div>
 
                 @if (IsCreate)
                 {
                     <div class="col-md-6">
-                        <label class="form-label" for="userPassword">
-                            Temporary Password
-                        </label>
-
-                        <InputText id="userPassword"
-                                   class="form-control"
-                                   type="password"
-                                   autocomplete="new-password"
-                                   @bind-Value="Model.Password" />
-
-                        <ValidationMessage For="@(() => Model.Password)" />
+                        <MudTextField T="string"
+                                      Label="Temporary Password"
+                                      @bind-Value="Model.Password"
+                                      For="@(() => Model.Password)"
+                                      InputType="InputType.Password"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      FullWidth="true"
+                                      UserAttributes="@PasswordAttributes" />
                     </div>
                 }
 
                 <div class="col-md-6">
-                    <label class="form-label" for="userRole">
-                        Role
-                    </label>
+                    <MudSelect T="string"
+                               Label="Role"
+                               @bind-Value="Model.Role"
+                               For="@(() => Model.Role)"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               FullWidth="true">
 
-                    <InputSelect id="userRole"
-                                 class="form-select"
-                                 @bind-Value="Model.Role">
+                        <MudSelectItem T="string" Value="@("Customer")">
+                            Customer
+                        </MudSelectItem>
 
-                        <option value="Customer">Customer</option>
-                        <option value="Technician">Technician</option>
-                        <option value="Admin">Admin</option>
+                        <MudSelectItem T="string" Value="@("Technician")">
+                            Technician
+                        </MudSelectItem>
 
-                    </InputSelect>
+                        <MudSelectItem T="string" Value="@("Admin")">
+                            Admin
+                        </MudSelectItem>
 
-                    <ValidationMessage For="@(() => Model.Role)" />
+                    </MudSelect>
                 </div>
 
             </div>
 
             <div class="mt-4 d-flex gap-2">
 
-                <button type="submit"
-                        class="btn btn-primary"
-                        disabled="@IsSubmitting">
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@IsSubmitting">
 
                     @if (IsSubmitting)
                     {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <MudProgressCircular Indeterminate="true"
+                                             Size="Size.Small"
+                                             Class="me-2" />
                         <span>Saving...</span>
                     }
                     else
                     {
-                        <span>@SubmitButtonText</span>
+                        @SubmitButtonText
                     }
 
-                </button>
+                </MudButton>
 
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        disabled="@IsSubmitting"
-                        @onclick="OnCancel">
+                <MudButton ButtonType="ButtonType.Button"
+                           Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           Disabled="@IsSubmitting"
+                           OnClick="@OnCancel">
                     Cancel
-                </button>
+                </MudButton>
 
             </div>
 
@@ -133,6 +138,24 @@
 
     private string SubmitButtonText =>
         IsCreate ? "Create User" : "Save Changes";
+
+    private static readonly Dictionary<string, object> FullNameAttributes =
+        new()
+        {
+            ["autocomplete"] = "name"
+        };
+
+    private static readonly Dictionary<string, object> EmailAttributes =
+        new()
+        {
+            ["autocomplete"] = "email"
+        };
+
+    private static readonly Dictionary<string, object> PasswordAttributes =
+        new()
+        {
+            ["autocomplete"] = "new-password"
+        };
 
     protected override void OnParametersSet()
     {

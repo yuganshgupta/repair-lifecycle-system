@@ -83,6 +83,38 @@ namespace RepairSystem.Infrastructure.Data.Migrations
                     b.ToTable("Complaints");
                 });
 
+            modelBuilder.Entity("RepairSystem.Domain.Entities.ComplaintStatusHistory", b =>
+                {
+                    b.Property<int>("ComplaintStatusHistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ComplaintStatusHistoryId"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ChangedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ComplaintId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NewStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PreviousStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("ComplaintStatusHistoryId");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("ComplaintId");
+
+                    b.ToTable("ComplaintStatusHistories");
+                });
+
             modelBuilder.Entity("RepairSystem.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<int>("RefreshTokenId")
@@ -201,6 +233,25 @@ namespace RepairSystem.Infrastructure.Data.Migrations
                     b.Navigation("AssignedTechnician");
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("RepairSystem.Domain.Entities.ComplaintStatusHistory", b =>
+                {
+                    b.HasOne("RepairSystem.Domain.Entities.User", "ChangedByUser")
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RepairSystem.Domain.Entities.Complaint", "Complaint")
+                        .WithMany()
+                        .HasForeignKey("ComplaintId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ChangedByUser");
+
+                    b.Navigation("Complaint");
                 });
 
             modelBuilder.Entity("RepairSystem.Domain.Entities.RefreshToken", b =>

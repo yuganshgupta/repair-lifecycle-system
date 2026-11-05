@@ -17,6 +17,9 @@ public class RepairDbContext : DbContext
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<ComplaintStatusHistory> ComplaintStatusHistories
+    => Set<ComplaintStatusHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -75,5 +78,20 @@ public class RepairDbContext : DbContext
             .WithMany(user => user.RefreshTokens)
             .HasForeignKey(token => token.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ComplaintStatusHistory>()
+    .HasKey(history => history.ComplaintStatusHistoryId);
+
+        modelBuilder.Entity<ComplaintStatusHistory>()
+            .HasOne(history => history.Complaint)
+            .WithMany()
+            .HasForeignKey(history => history.ComplaintId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ComplaintStatusHistory>()
+            .HasOne(history => history.ChangedByUser)
+            .WithMany()
+            .HasForeignKey(history => history.ChangedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
