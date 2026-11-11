@@ -1,5 +1,4 @@
 ﻿
-using System.Text;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -9,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using RepairSystem.Application.Interfaces.Auth;
 using RepairSystem.Application.Interfaces.Complaints;
+using RepairSystem.Application.Interfaces.SystemLogs;
+using System.Text;
 
 namespace RepairSystem.Api.Tests;
 
@@ -23,6 +24,8 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
     public FakeAuthService FakeAuthService { get; } = new();
 
     public FakeComplaintService FakeComplaintService { get; } = new();
+
+    public FakeSystemLogService FakeSystemLogService { get; } = new();
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -50,6 +53,16 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
 
+        // Prevent integration tests from writing to the real logging database.
+        builder.ConfigureAppConfiguration((_, configuration) =>
+        {
+            configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Serilog:SqlServer:Enabled"] = "false"
+                });
+        });
+
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IAuthService>();
@@ -57,6 +70,9 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IComplaintService>();
             services.AddSingleton<IComplaintService>(FakeComplaintService);
+
+            services.RemoveAll<ISystemLogService>();
+            services.AddSingleton<ISystemLogService>(FakeSystemLogService);
         });
     }
 }

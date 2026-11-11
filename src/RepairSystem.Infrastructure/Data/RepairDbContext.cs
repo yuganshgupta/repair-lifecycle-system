@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RepairSystem.Domain.Entities;
+using RepairSystem.Infrastructure.ReadModels;
 
 namespace RepairSystem.Infrastructure.Data;
 
@@ -19,6 +20,8 @@ public class RepairDbContext : DbContext
 
     public DbSet<ComplaintStatusHistory> ComplaintStatusHistories
     => Set<ComplaintStatusHistory>();
+
+    public DbSet<SystemLogEntry> SystemLogs => Set<SystemLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,5 +96,63 @@ public class RepairDbContext : DbContext
             .WithMany()
             .HasForeignKey(history => history.ChangedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SystemLogEntry>(entity =>
+        {
+            entity.HasNoKey();
+
+            entity.ToTable(
+                "SystemLogs",
+                "dbo",
+                table => table.ExcludeFromMigrations());
+
+            entity.Property(log => log.Id)
+                .HasColumnName("Id");
+
+            entity.Property(log => log.Message)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(log => log.MessageTemplate)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(log => log.Level)
+                .HasMaxLength(16);
+
+            entity.Property(log => log.TimeStamp)
+                .HasColumnType("datetime");
+
+            entity.Property(log => log.Exception)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(log => log.Properties)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(log => log.ActorRole)
+                .HasMaxLength(32);
+
+            entity.Property(log => log.RequestMethod)
+                .HasMaxLength(16);
+
+            entity.Property(log => log.RequestPath)
+                .HasMaxLength(512);
+
+            entity.Property(log => log.Elapsed)
+                .HasColumnType("float");
+
+            entity.Property(log => log.CorrelationId)
+                .HasMaxLength(64);
+
+            entity.Property(log => log.Action)
+                .HasMaxLength(64);
+
+            entity.Property(log => log.ResourceType)
+                .HasMaxLength(64);
+
+            entity.Property(log => log.Outcome)
+                .HasMaxLength(32);
+
+            entity.Property(log => log.Application)
+                .HasMaxLength(64);
+        });
     }
 }

@@ -1,0 +1,881 @@
+﻿
+@page "/admin/system-logs"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using System.Globalization
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using System.Text.Json
+@using RepairSystem.Web.Features.Admin.Contracts
+@using RepairSystem.Web.Services.Authentication
+
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApiTokenSessionStore TokenStore
+@inject ISnackbar Snackbar
+
+<MudProviders />
+
+<PageTitle>System Logs</PageTitle>
+
+<div class="container-fluid mt-4 mb-5 px-3">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">System Logs</h1>
+            <p class="text-muted mb-0">
+                Monitor API requests and investigate system activity.
+            </p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="_isRefreshing"
+                       OnClick="RefreshAsync">
+                Refresh
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="/dashboard">
+                Dashboard
+            </MudButton>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_pageError))
+    {
+        <MudAlert Severity="Severity.Error"
+                  Dense="true"
+                  Class="mb-3">
+            @_pageError
+        </MudAlert>
+    }
+
+    <MudPaper Elevation="0"
+              Outlined="true"
+              Class="pa-4 mb-4">
+
+        <MudText Typo="Typo.h6" Class="mb-3">
+            Search and filters
+        </MudText>
+
+        <MudGrid Spacing="3">
+
+            <MudItem xs="12" md="4">
+                <MudTextField T="string"
+                              @bind-Value="_searchTerm"
+                              Label="Search"
+                              Placeholder="Endpoint, message, action or correlation ID"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="string"
+                           @bind-Value="_requestMethod"
+                           Label="HTTP method"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Clearable="true">
+                    <MudSelectItem T="string" Value="@("GET")">GET</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("POST")">POST</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("PUT")">PUT</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("PATCH")">PATCH</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("DELETE")">DELETE</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="string"
+                           @bind-Value="_level"
+                           Label="Log level"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Clearable="true">
+                    <MudSelectItem T="string" Value="@("Information")">Information</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Warning")">Warning</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Error")">Error</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Fatal")">Fatal</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Debug")">Debug</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="2">
+                <MudTextField T="string"
+                              @bind-Value="_statusCodeText"
+                              Label="HTTP status"
+                              Placeholder="e.g. 403"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="2">
+                <MudTextField T="string"
+                              @bind-Value="_actorUserIdText"
+                              Label="User ID"
+                              Placeholder="e.g. 3"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="string"
+                           @bind-Value="_actorRole"
+                           Label="User role"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Clearable="true">
+                    <MudSelectItem T="string" Value="@("Admin")">Admin</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Technician")">Technician</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Customer")">Customer</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="From date"
+                               @bind-Date="_fromDate"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               DateFormat="dd MMM yyyy"
+                               Clearable="true" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="To date"
+                               @bind-Date="_toDate"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               DateFormat="dd MMM yyyy"
+                               Clearable="true" />
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <div class="d-flex flex-wrap gap-2 align-center mt-1">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.FilterAlt"
+                               OnClick="ApplyFiltersAsync">
+                        Apply filters
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
+                               OnClick="ClearFiltersAsync">
+                        Clear all
+                    </MudButton>
+                </div>
+            </MudItem>
+
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+
+            <div>
+                <MudText Typo="Typo.h6">System activity</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @_totalCount.ToString("N0") matching records
+                </MudText>
+            </div>
+
+            <MudChip T="string"
+                     Variant="Variant.Outlined"
+                     Color="Color.Info"
+                     Size="Size.Small">
+                SQL Server · RepairLifecycleDb
+            </MudChip>
+
+        </div>
+
+        <MudTable T="SystemLogApiDto"
+                  @ref="_table"
+                  ServerData="LoadServerData"
+                  RowsPerPage="25"
+                  Dense="true"
+                  Hover="true"
+                  Striped="true"
+                  Bordered="true"
+                  Elevation="0"
+                  Breakpoint="Breakpoint.Sm">
+
+            <HeaderContent>
+
+                <MudTh>
+                    <MudTableSortLabel T="SystemLogApiDto" SortLabel="timestamp">
+                        Timestamp
+                    </MudTableSortLabel>
+                </MudTh>
+
+                <MudTh>
+                    <MudTableSortLabel T="SystemLogApiDto" SortLabel="level">
+                        Level
+                    </MudTableSortLabel>
+                </MudTh>
+
+                <MudTh>Actor</MudTh>
+
+                <MudTh>
+                    <MudTableSortLabel T="SystemLogApiDto" SortLabel="method">
+                        Method
+                    </MudTableSortLabel>
+                </MudTh>
+
+                <MudTh>
+                    <MudTableSortLabel T="SystemLogApiDto" SortLabel="endpoint">
+                        Endpoint
+                    </MudTableSortLabel>
+                </MudTh>
+
+                <MudTh>
+                    <MudTableSortLabel T="SystemLogApiDto" SortLabel="statuscode">
+                        Status
+                    </MudTableSortLabel>
+                </MudTh>
+
+                <MudTh>
+                    <MudTableSortLabel T="SystemLogApiDto" SortLabel="elapsed">
+                        Duration
+                    </MudTableSortLabel>
+                </MudTh>
+
+                <MudTh>Details</MudTh>
+
+            </HeaderContent>
+
+            <RowTemplate Context="log">
+
+                <MudTd DataLabel="Timestamp">
+                    <span class="text-nowrap">
+                        @(log.TimeStamp?.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss") ?? "—")
+                    </span>
+                </MudTd>
+
+                <MudTd DataLabel="Level">
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@GetLevelColor(log.Level)"
+                             Variant="Variant.Outlined">
+                        @(log.Level ?? "Unknown")
+                    </MudChip>
+                </MudTd>
+
+                <MudTd DataLabel="Actor">
+                    @if (log.ActorUserId.HasValue)
+                    {
+                        <div>
+                            <strong>#@log.ActorUserId</strong>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @(log.ActorRole ?? "Unknown role")
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Anonymous / system
+                        </MudText>
+                    }
+                </MudTd>
+
+                <MudTd DataLabel="Method">
+                    @if (!string.IsNullOrWhiteSpace(log.RequestMethod))
+                    {
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Variant="Variant.Outlined"
+                                 Color="@GetMethodColor(log.RequestMethod)">
+                            @log.RequestMethod
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <span>—</span>
+                    }
+                </MudTd>
+
+                <MudTd DataLabel="Endpoint">
+                    <div style="max-width:300px; overflow-wrap:anywhere;">
+                        <strong>@(log.RequestPath ?? log.Action ?? "System event")</strong>
+                        @if (!string.IsNullOrWhiteSpace(log.Action))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @log.Action
+                            </MudText>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(log.Message))
+                        {
+                            <MudText Typo="Typo.caption"
+                                     Color="Color.Secondary"
+                                     Style="overflow-wrap:anywhere;">
+                                @log.Message
+                            </MudText>
+                        }
+                    </div>
+                </MudTd>
+
+                <MudTd DataLabel="Status">
+                    @if (log.StatusCode.HasValue)
+                    {
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@GetStatusColor(log.StatusCode.Value)">
+                            @log.StatusCode
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <span>—</span>
+                    }
+                </MudTd>
+
+                <MudTd DataLabel="Duration">
+                    @(log.Elapsed.HasValue
+                        ? $"{log.Elapsed.Value:N2} ms"
+                        : "—")
+                </MudTd>
+
+                <MudTd DataLabel="Details">
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="@(() => SelectLog(log))">
+                        Inspect
+                    </MudButton>
+                </MudTd>
+
+            </RowTemplate>
+
+            <NoRecordsContent>
+                <div class="text-center pa-5">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff"
+                             Size="Size.Large"
+                             Color="Color.Default" />
+                    <MudText Typo="Typo.subtitle1" Class="mt-2">
+                        No matching log records
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Adjust the search criteria or clear the filters.
+                    </MudText>
+                </div>
+            </NoRecordsContent>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="_pageSizeOptions" />
+            </PagerContent>
+
+        </MudTable>
+
+    </MudPaper>
+
+    @if (_selectedLog is not null)
+    {
+        <MudPaper Elevation="0"
+                  Outlined="true"
+                  Class="pa-4 mt-4">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <MudText Typo="Typo.h6">
+                        Log entry #@_selectedLog.Id
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Detailed event information
+                    </MudText>
+                </div>
+
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.Close"
+                           OnClick="@(() => _selectedLog = null)">
+                    Close
+                </MudButton>
+            </div>
+
+            <MudGrid Spacing="2">
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Timestamp
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_selectedLog.TimeStamp?.ToLocalTime().ToString("F") ?? "—")
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Application
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_selectedLog.Application ?? "—")
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Actor
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_selectedLog.ActorUserId?.ToString() ?? "Anonymous / system")
+                        · @(_selectedLog.ActorRole ?? "—")
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Outcome
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_selectedLog.Outcome ?? "—")
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Message
+                    </MudText>
+                    <MudPaper Class="pa-3 mt-1" Outlined="true">
+                        <MudText Typo="Typo.body2" Style="overflow-wrap:anywhere;">
+                            @(_selectedLog.Message ?? "No message recorded.")
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Correlation ID
+                    </MudText>
+                    <MudText Typo="Typo.body2" Style="overflow-wrap:anywhere;">
+                        @(_selectedLog.CorrelationId ?? "—")
+                    </MudText>
+                </MudItem>
+
+                @if (!string.IsNullOrWhiteSpace(_selectedLog.Exception))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Error">
+                            Exception
+                        </MudText>
+                        <MudPaper Class="pa-3 mt-1" Outlined="true">
+                            <pre style="white-space:pre-wrap; overflow-wrap:anywhere; margin:0;">@_selectedLog.Exception</pre>
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_selectedLog.Properties))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Structured properties
+                        </MudText>
+                        <MudPaper Class="pa-3 mt-1" Outlined="true">
+                            <pre style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:350px; overflow:auto; margin:0;">@_selectedLog.Properties</pre>
+                        </MudPaper>
+                    </MudItem>
+                }
+
+            </MudGrid>
+
+        </MudPaper>
+    }
+
+</div>
+
+@code {
+    private MudTable<SystemLogApiDto>? _table;
+
+    private readonly int[] _pageSizeOptions = [10, 25, 50, 100];
+
+    private string? _searchTerm;
+    private string? _requestMethod;
+    private string? _level;
+    private string? _statusCodeText;
+    private string? _actorUserIdText;
+    private string? _actorRole;
+
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+
+    private SystemLogApiDto? _selectedLog;
+
+    private string? _pageError;
+
+    private bool _isRefreshing;
+
+    private int _totalCount;
+
+    private async Task<TableData<SystemLogApiDto>> LoadServerData(
+        TableState state,
+        CancellationToken cancellationToken)
+    {
+        _pageError = null;
+
+        if (!int.TryParse(_statusCodeText, out var statusCode) &&
+            !string.IsNullOrWhiteSpace(_statusCodeText))
+        {
+            _pageError = "Enter a valid HTTP status code.";
+            return EmptyTable();
+        }
+
+        if (!int.TryParse(_actorUserIdText, out var actorUserId) &&
+            !string.IsNullOrWhiteSpace(_actorUserIdText))
+        {
+            _pageError = "Enter a valid numeric user ID.";
+            return EmptyTable();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_statusCodeText) &&
+            statusCode is < 100 or > 599)
+        {
+            _pageError = "HTTP status codes must be between 100 and 599.";
+            return EmptyTable();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_actorUserIdText) &&
+            actorUserId <= 0)
+        {
+            _pageError = "User ID must be a positive number.";
+            return EmptyTable();
+        }
+
+        if (_fromDate.HasValue &&
+            _toDate.HasValue &&
+            _fromDate.Value.Date > _toDate.Value.Date)
+        {
+            _pageError = "The start date cannot be later than the end date.";
+            return EmptyTable();
+        }
+
+        var parameters = new List<string>();
+
+        AddParameter(parameters, "page", (state.Page + 1).ToString(
+            CultureInfo.InvariantCulture));
+
+        AddParameter(parameters, "pageSize", state.PageSize.ToString(
+            CultureInfo.InvariantCulture));
+
+        AddParameter(parameters, "searchTerm", _searchTerm);
+        AddParameter(parameters, "requestMethod", _requestMethod);
+        AddParameter(parameters, "level", _level);
+        AddParameter(parameters, "actorRole", _actorRole);
+
+        if (!string.IsNullOrWhiteSpace(_statusCodeText))
+        {
+            AddParameter(parameters, "statusCode", statusCode.ToString(
+                CultureInfo.InvariantCulture));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_actorUserIdText))
+        {
+            AddParameter(parameters, "actorUserId", actorUserId.ToString(
+                CultureInfo.InvariantCulture));
+        }
+
+        if (_fromDate.HasValue)
+        {
+            var fromLocal = DateTime.SpecifyKind(
+                _fromDate.Value.Date,
+                DateTimeKind.Local);
+
+            AddParameter(
+                parameters,
+                "fromUtc",
+                fromLocal.ToUniversalTime().ToString(
+                    "O",
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (_toDate.HasValue)
+        {
+            // SQL Server datetime has approximately 3 ms precision.
+            // Subtracting 3 ms avoids rolling the end value into
+            // the following calendar day.
+            var toLocal = DateTime.SpecifyKind(
+                _toDate.Value.Date.AddDays(1).AddMilliseconds(-3),
+                DateTimeKind.Local);
+
+            AddParameter(
+                parameters,
+                "toUtc",
+                toLocal.ToUniversalTime().ToString(
+                    "O",
+                    CultureInfo.InvariantCulture));
+        }
+
+        var sortBy = string.IsNullOrWhiteSpace(state.SortLabel)
+            ? "timestamp"
+            : state.SortLabel;
+
+        AddParameter(parameters, "sortBy", sortBy);
+
+        var sortDescending =
+            state.SortDirection != SortDirection.Ascending;
+
+        AddParameter(
+            parameters,
+            "sortDescending",
+            sortDescending.ToString().ToLowerInvariant());
+
+        var queryString = string.Join("&", parameters);
+
+        try
+        {
+            var session = await GetApiSessionAsync();
+
+            if (session is null)
+            {
+                return EmptyTable();
+            }
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"api/admin/system-logs?{queryString}");
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    session.AccessToken);
+
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _pageError =
+                    "Your API session has expired. Please sign in again.";
+
+                return EmptyTable();
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _pageError =
+                    "The API denied access. An Admin role is required.";
+
+                return EmptyTable();
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError =
+                    $"Could not retrieve system logs. API returned " +
+                    $"{(int)response.StatusCode} ({response.StatusCode}).";
+
+                return EmptyTable();
+            }
+
+            var result =
+                await response.Content.ReadFromJsonAsync<
+                    PagedSystemLogApiResponse>(
+                    cancellationToken: cancellationToken);
+
+            if (result is null)
+            {
+                _pageError = "The API returned an empty log response.";
+                return EmptyTable();
+            }
+
+            _totalCount = result.TotalCount;
+
+            return new TableData<SystemLogApiDto>
+            {
+                TotalItems = result.TotalCount,
+                Items = result.Items
+            };
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            _pageError =
+                "Could not connect to the API. Make sure it is running.";
+
+            return EmptyTable();
+        }
+        catch (TaskCanceledException)
+        {
+            _pageError =
+                "The API request timed out. Please try again.";
+
+            return EmptyTable();
+        }
+        catch (JsonException)
+        {
+            _pageError =
+                "The API returned an invalid system logs response.";
+
+            return EmptyTable();
+        }
+    }
+
+    private async Task<ApiTokenSession?> GetApiSessionAsync()
+    {
+        var authState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true ||
+            !user.IsInRole("Admin"))
+        {
+            _pageError = "Only authenticated administrators can view system logs.";
+            return null;
+        }
+
+        var sessionId = user
+            .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+            ?.Value;
+
+        if (string.IsNullOrWhiteSpace(sessionId) ||
+            !TokenStore.TryGet(sessionId, out var session) ||
+            session is null)
+        {
+            _pageError =
+                "Your session is unavailable. Please sign out and sign in again.";
+
+            return null;
+        }
+
+        if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            _pageError =
+                "Your API token has expired. Please sign out and sign in again.";
+
+            return null;
+        }
+
+        return session;
+    }
+
+    private static void AddParameter(
+        List<string> parameters,
+        string name,
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        parameters.Add(
+            $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}");
+    }
+
+    private static TableData<SystemLogApiDto> EmptyTable()
+    {
+        return new TableData<SystemLogApiDto>
+        {
+            TotalItems = 0,
+            Items = Array.Empty<SystemLogApiDto>()
+        };
+    }
+
+    private Color GetLevelColor(string? level)
+    {
+        return level?.ToLowerInvariant() switch
+        {
+            "error" or "fatal" => Color.Error,
+            "warning" => Color.Warning,
+            "information" => Color.Info,
+            "debug" => Color.Default,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetMethodColor(string? method)
+    {
+        return method?.ToUpperInvariant() switch
+        {
+            "GET" => Color.Info,
+            "POST" => Color.Success,
+            "PUT" => Color.Warning,
+            "PATCH" => Color.Secondary,
+            "DELETE" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetStatusColor(int statusCode)
+    {
+        return statusCode switch
+        {
+            >= 200 and < 300 => Color.Success,
+            >= 300 and < 400 => Color.Info,
+            >= 400 and < 500 => Color.Warning,
+            >= 500 => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        _selectedLog = null;
+
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _searchTerm = null;
+        _requestMethod = null;
+        _level = null;
+        _statusCodeText = null;
+        _actorUserIdText = null;
+        _actorRole = null;
+        _fromDate = null;
+        _toDate = null;
+        _selectedLog = null;
+
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_table is null)
+        {
+            return;
+        }
+
+        _isRefreshing = true;
+
+        try
+        {
+            await _table.ReloadServerData();
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private void SelectLog(SystemLogApiDto log)
+    {
+        _selectedLog = log;
+    }
+}

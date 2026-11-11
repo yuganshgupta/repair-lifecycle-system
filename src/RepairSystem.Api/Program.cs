@@ -15,6 +15,14 @@ using RepairSystem.Infrastructure.Repositories.Complaints;
 using RepairSystem.Infrastructure.Repositories.Users;
 using Serilog;
 using Serilog.Events;
+using System.Collections.ObjectModel;
+using System.Data;
+using System.Diagnostics;
+using System.Security.Claims;
+using Serilog.Sinks.MSSqlServer;
+using RepairSystem.Application.Interfaces.SystemLogs;
+using RepairSystem.Application.Services.SystemLogs;
+using RepairSystem.Infrastructure.Repositories.SystemLogs;
 
 
 // start the API and load its configuration
@@ -31,15 +39,149 @@ builder.Services.AddSerilog((services, loggerConfiguration) =>
 {
     loggerConfiguration
         .MinimumLevel.Information()
-        .MinimumLevel.Override(
-            "Microsoft.AspNetCore",
-            LogEventLevel.Warning)
+            .MinimumLevel.Override(
+                "Microsoft.AspNetCore",
+                LogEventLevel.Warning)
+           .MinimumLevel.Override(
+                "Microsoft.EntityFrameworkCore",
+                 LogEventLevel.Warning)
         .Enrich.FromLogContext()
+        .Enrich.WithProperty(
+            "Application",
+            "RepairSystem.Api")
         .WriteTo.Console()
         .WriteTo.File(
             Path.Combine(logDirectory, "repair-api-.log"),
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 7);
+
+    // SQL logging is explicitly controlled by configuration.
+    var sqlLoggingEnabled = builder.Configuration.GetValue<bool>(
+        "Serilog:SqlServer:Enabled");
+
+    // Integration tests set this to false.
+    if (!sqlLoggingEnabled)
+    {
+        return;
+    }
+
+    var sqlConnectionString = builder.Configuration
+        .GetConnectionString("RepairDatabase");
+
+    if (string.IsNullOrWhiteSpace(sqlConnectionString))
+    {
+        throw new InvalidOperationException(
+            "SQL logging is enabled, but the RepairDatabase connection string is missing.");
+    }
+
+    var columnOptions = new ColumnOptions
+    {
+        AdditionalColumns = new Collection<SqlColumn>
+        {
+            new()
+            {
+                ColumnName = "ActorUserId",
+                DataType = SqlDbType.Int,
+                AllowNull = true,
+                NonClusteredIndex = true
+            },
+            new()
+            {
+                ColumnName = "ActorRole",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 32,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "RequestMethod",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 16,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "RequestPath",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 512,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "StatusCode",
+                DataType = SqlDbType.Int,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "Elapsed",
+                DataType = SqlDbType.Float,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "CorrelationId",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 64,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "Action",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 64,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "ResourceType",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 64,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "ResourceId",
+                DataType = SqlDbType.Int,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "Outcome",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 32,
+                AllowNull = true
+            },
+            new()
+            {
+                ColumnName = "Application",
+                DataType = SqlDbType.NVarChar,
+                DataLength = 64,
+                AllowNull = true
+            }
+        }
+    };
+
+    // Store timestamps in UTC and optimize recent-log queries.
+    columnOptions.TimeStamp.ConvertToUtc = true;
+    columnOptions.TimeStamp.NonClusteredIndex = true;
+    columnOptions.TimeStamp.NonClusteredIndexDirection =
+        SqlIndexDirection.Desc;
+
+    var sinkOptions = new MSSqlServerSinkOptions
+    {
+        TableName = "SystemLogs",
+        SchemaName = "dbo",
+        AutoCreateSqlTable = false,
+        BatchPostingLimit = 50,
+        BatchPeriod = TimeSpan.FromSeconds(5)
+    };
+
+    loggerConfiguration.WriteTo.MSSqlServer(
+        connectionString: sqlConnectionString,
+        sinkOptions: sinkOptions,
+        columnOptions: columnOptions,
+        restrictedToMinimumLevel: LogEventLevel.Information);
 });
 
 
@@ -102,6 +244,13 @@ builder.Services.AddScoped<
     IComplaintService,
     ComplaintService>();
 
+builder.Services.AddScoped<
+    ISystemLogRepository,
+    SystemLogRepository>();
+
+builder.Services.AddScoped<
+    ISystemLogService,
+    SystemLogService>();
 
 builder.Services.AddSingleton<
     IAccessTokenGenerator,
@@ -138,7 +287,51 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    // Categorise failed requests appropriately.
+    options.GetLevel = (httpContext, elapsed, exception) =>
+    {
+        if (exception is not null ||
+            httpContext.Response.StatusCode >= 500)
+        {
+            return LogEventLevel.Error;
+        }
+
+        if (httpContext.Response.StatusCode >= 400)
+        {
+            return LogEventLevel.Warning;
+        }
+
+        return LogEventLevel.Information;
+    };
+
+    // Attach authenticated user and request information.
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        var userId = httpContext.User
+            .FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (int.TryParse(userId, out var actorUserId))
+        {
+            diagnosticContext.Set("ActorUserId", actorUserId);
+        }
+
+        var role = httpContext.User
+            .FindFirst(ClaimTypes.Role)?.Value;
+
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            diagnosticContext.Set("ActorRole", role);
+        }
+
+        var correlationId =
+            Activity.Current?.TraceId.ToString()
+            ?? httpContext.TraceIdentifier;
+
+        diagnosticContext.Set("CorrelationId", correlationId);
+    };
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -92,7 +92,7 @@ builder.Services.AddHttpClient("RepairApi", client =>
 {
     client.BaseAddress = new Uri(
         builder.Configuration["ApiBaseUrl"]
-        ?? "http://localhost:5276/");
+        ?? "https://localhost:7063/");
 });
 
 var app = builder.Build();
