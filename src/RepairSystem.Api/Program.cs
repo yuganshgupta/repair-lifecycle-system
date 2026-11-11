@@ -5,18 +5,43 @@ using Microsoft.IdentityModel.Tokens;
 using RepairSystem.Api.OpenApi;
 using RepairSystem.Api.Security;
 using RepairSystem.Application.Interfaces.Auth;
+using RepairSystem.Application.Interfaces.Complaints;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Application.Services.Auth;
+using RepairSystem.Application.Services.Complaints;
 using RepairSystem.Domain.Entities;
 using RepairSystem.Infrastructure.Data;
-using RepairSystem.Infrastructure.Repositories.Users;
-using RepairSystem.Application.Interfaces.Complaints;
-using RepairSystem.Application.Services.Complaints;
 using RepairSystem.Infrastructure.Repositories.Complaints;
+using RepairSystem.Infrastructure.Repositories.Users;
+using Serilog;
+using Serilog.Events;
 
 
 // start the API and load its configuration
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog for API diagnostic logging.
+var logDirectory = Path.Combine(
+    builder.Environment.ContentRootPath,
+    "logs");
+
+Directory.CreateDirectory(logDirectory);
+
+builder.Services.AddSerilog((services, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override(
+            "Microsoft.AspNetCore",
+            LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.File(
+            Path.Combine(logDirectory, "repair-api-.log"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 7);
+});
+
 
 // get the JWT key from User Secrets
 // we don't want to store the actual key in appsettings.json
@@ -112,6 +137,8 @@ builder.Services.AddOpenApi(options =>
 });
 
 var app = builder.Build();
+
+app.UseSerilogRequestLogging();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

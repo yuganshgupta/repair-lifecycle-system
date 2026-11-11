@@ -5,8 +5,32 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 using RepairSystem.Web.Components;
 using RepairSystem.Web.Services.Authentication;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog for Web application diagnostics.
+var logDirectory = Path.Combine(
+    builder.Environment.ContentRootPath,
+    "logs");
+
+Directory.CreateDirectory(logDirectory);
+
+builder.Services.AddSerilog((services, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override(
+            "Microsoft.AspNetCore",
+            LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.File(
+            Path.Combine(logDirectory, "repair-web-.log"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 7);
+});
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -72,6 +96,7 @@ builder.Services.AddHttpClient("RepairApi", client =>
 });
 
 var app = builder.Build();
+app.UseSerilogRequestLogging();
 
 if (!app.Environment.IsDevelopment())
 {
