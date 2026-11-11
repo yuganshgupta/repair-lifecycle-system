@@ -13,4 +13,12 @@ public interface IComplaintService
 
     Task<IReadOnlyList<TechnicianComplaintDto>>
     GetTechnicianComplaintsAsync(int technicianId);
+
+    Task<ComplaintAssignmentResult> AssignTechnicianAsync(
+    int complaintId,
+    int technicianId,
+    int assignedByAdminId);
+
+    Task<IReadOnlyList<AdminUnassignedComplaintDto>>
+    GetUnassignedComplaintsAsync();
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RepairSystem.Application.Interfaces.Complaints;
 using RepairSystem.Domain.Entities;
+using RepairSystem.Domain.Enums;
 using RepairSystem.Infrastructure.Data;
 
 namespace RepairSystem.Infrastructure.Repositories.Complaints;
@@ -40,6 +41,34 @@ public sealed class ComplaintRepository : IComplaintRepository
                 complaint.AssignedTechnicianId == technicianId)
             .Include(complaint => complaint.Customer)
             .OrderByDescending(complaint => complaint.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<Complaint?> GetByIdAsync(int complaintId)
+    {
+        return await _context.Complaints
+            .SingleOrDefaultAsync(
+                complaint => complaint.ComplaintId == complaintId);
+    }
+
+    public async Task SaveAssignmentAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history)
+    {
+        _context.ComplaintStatusHistories.Add(history);
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<IReadOnlyList<Complaint>> GetUnassignedAsync()
+    {
+        return await _context.Complaints
+            .AsNoTracking()
+            .Where(complaint =>
+                complaint.AssignedTechnicianId == null &&
+                complaint.Status == ComplaintStatus.Submitted)
+            .Include(complaint => complaint.Customer)
+            .OrderBy(complaint => complaint.CreatedAt)
             .ToListAsync();
     }
 }

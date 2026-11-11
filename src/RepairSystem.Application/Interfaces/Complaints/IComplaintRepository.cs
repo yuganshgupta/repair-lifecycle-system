@@ -11,4 +11,12 @@ public interface IComplaintRepository
 
     Task<IReadOnlyList<Complaint>> GetAssignedToTechnicianAsync(
     int technicianId);
+
+    Task<Complaint?> GetByIdAsync(int complaintId);
+
+    Task SaveAssignmentAsync(
+        Complaint complaint,
+        ComplaintStatusHistory history);
+
+    Task<IReadOnlyList<Complaint>> GetUnassignedAsync();
 }

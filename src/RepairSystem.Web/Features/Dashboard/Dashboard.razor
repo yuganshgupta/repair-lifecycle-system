@@ -12,6 +12,8 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IApiTokenSessionStore TokenStore
 
+<MudProviders />
+
 <PageTitle>Dashboard</PageTitle>
 
 <div class="container mt-4">
@@ -312,12 +314,16 @@
                 <section class="card mb-3">
                     <div class="card-body">
                         <h2 class="h5">Technician dashboard</h2>
+
                         <p>
-                            Review assigned repair jobs and update repair progress.
+                            Review the repair requests assigned to your account.
                         </p>
-                        <p class="text-muted mb-0">
-                            Assignment and diagnosis features will be connected later.
-                        </p>
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Href="/technician/complaints">
+                            View assigned repairs
+                        </MudButton>
                     </div>
                 </section>
             }
@@ -329,12 +335,22 @@
                         <h2 class="h5">Admin dashboard</h2>
 
                         <p>
-                            Manage user accounts and oversee repair operations.
+                            Manage users and oversee repair assignments.
                         </p>
 
-                        <a href="/admin/users" class="btn btn-primary">
-                            Manage user accounts
-                        </a>
+                        <div class="d-flex flex-wrap gap-2">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Href="/admin/users">
+                                Manage user accounts
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Href="/admin/assignments">
+                                Assign complaints
+                            </MudButton>
+                        </div>
                     </div>
                 </section>
             }

@@ -1,0 +1,466 @@
+﻿@page "/admin/assignments"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using System.Text.Json
+@using RepairSystem.Web.Features.Admin.Contracts
+@using RepairSystem.Web.Services.Authentication
+
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApiTokenSessionStore TokenStore
+@inject ISnackbar Snackbar
+
+<MudProviders />
+
+<PageTitle>Assign Complaints</PageTitle>
+
+<div class="container mt-4 mb-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h1 class="mb-1">Complaint Assignments</h1>
+            <p class="text-muted mb-0">
+                Assign submitted repair requests to active Technicians.
+            </p>
+        </div>
+
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       OnClick="LoadDataAsync"
+                       Disabled="@_isLoading">
+                Refresh
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       Href="/dashboard">
+                Dashboard
+            </MudButton>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="card">
+            <div class="card-body text-center p-5">
+                <MudProgressCircular Color="Color.Primary"
+                                     Indeterminate="true" />
+                <p class="text-muted mt-3 mb-0">
+                    Loading complaints and Technicians...
+                </p>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger d-flex align-items-center justify-content-between">
+            <span>@_error</span>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       Class="ms-2"
+                       OnClick="LoadDataAsync">
+                Retry
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted">Awaiting assignment</div>
+                        <h2 class="mb-0">@_complaints.Count</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted">Active Technicians</div>
+                        <h2 class="mb-0">@_technicians.Count</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="card">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Unassigned Repair Requests</h2>
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="Color.Default"
+                         Variant="Variant.Outlined">
+                    @_complaints.Count pending
+                </MudChip>
+            </div>
+
+            @if (_complaints.Count == 0)
+            {
+                <div class="card-body text-center py-5">
+                    <h3 class="h6">No complaints awaiting assignment</h3>
+                    <p class="text-muted mb-0">
+                        New submitted complaints will appear here.
+                    </p>
+                </div>
+            }
+            else
+            {
+                <MudTable T="UnassignedComplaintApiDto"
+                          Items="@_complaints"
+                          Hover="true"
+                          Striped="true"
+                          Dense="true"
+                          Breakpoint="Breakpoint.Sm">
+
+                    <HeaderContent>
+                        <MudTh>Ticket</MudTh>
+                        <MudTh>Customer</MudTh>
+                        <MudTh>Device</MudTh>
+                        <MudTh>Issue</MudTh>
+                        <MudTh>Submitted</MudTh>
+                        <MudTh Style="min-width: 220px;">Technician</MudTh>
+                        <MudTh Class="text-end">Action</MudTh>
+                    </HeaderContent>
+
+                    <RowTemplate Context="complaint">
+                        <MudTd DataLabel="Ticket">
+                            <strong>@complaint.TicketNumber</strong>
+                            <div>
+                                <MudChip T="string"
+                                         Size="Size.Small"
+                                         Color="Color.Default"
+                                         Variant="Variant.Outlined">
+                                    @complaint.Status
+                                </MudChip>
+                            </div>
+                        </MudTd>
+
+                        <MudTd DataLabel="Customer">
+                            @complaint.CustomerName
+                        </MudTd>
+
+                        <MudTd DataLabel="Device">
+                            <strong>
+                                @complaint.DeviceBrand @complaint.DeviceModel
+                            </strong>
+                            <div class="small text-muted">
+                                @complaint.DeviceType
+                            </div>
+                        </MudTd>
+
+                        <MudTd DataLabel="Issue" Style="min-width: 220px;">
+                            <div>@complaint.IssueDescription</div>
+
+                            @if (complaint.ClaimedWarranty)
+                            {
+                                <MudChip T="string"
+                                         Size="Size.Small"
+                                         Color="Color.Info"
+                                         Variant="Variant.Text"
+                                         Class="mt-1">
+                                    Warranty claimed
+                                </MudChip>
+                            }
+                        </MudTd>
+
+                        <MudTd DataLabel="Submitted">
+                            @(complaint.CreatedAt.ToLocalTime().ToString("dd MMM yyyy"))
+                        </MudTd>
+
+                        <MudTd DataLabel="Technician">
+                            <MudSelect T="int"
+                                       @bind-Value="complaint.SelectedTechnicianId"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Dense="true"
+                                       Disabled="@(_assigningComplaintId.HasValue || _technicians.Count == 0)"
+                                       aria-label="@($"Select Technician for {complaint.TicketNumber}")">
+                                <MudSelectItem T="int" Value="0">
+                                    Select Technician
+                                </MudSelectItem>
+
+                                @foreach (var technician in _technicians)
+                                {
+                                    <MudSelectItem T="int" Value="@technician.UserId">
+                                        @technician.FullName
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudTd>
+
+                        <MudTd DataLabel="Action" Class="text-end">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Disabled="@(_assigningComplaintId.HasValue ||
+                                           complaint.SelectedTechnicianId <= 0 ||
+                                           _technicians.Count == 0)"
+                                       OnClick="@(() => AssignAsync(complaint))">
+                                @if (_assigningComplaintId == complaint.ComplaintId)
+                                {
+                                    <MudProgressCircular Indeterminate="true"
+                                                         Size="Size.Small"
+                                                         Class="me-2" />
+                                    <span>Assigning...</span>
+                                }
+                                else
+                                {
+                                    <span>Assign</span>
+                                }
+                            </MudButton>
+                        </MudTd>
+                    </RowTemplate>
+
+                </MudTable>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private List<UnassignedComplaintApiDto> _complaints = [];
+    private List<AdminUserApiDto> _technicians = [];
+
+    private bool _isLoading = true;
+    private string? _error;
+    private int? _assigningComplaintId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            var token = await GetAccessTokenAsync();
+
+            if (token is null)
+                return;
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            // Load all Admin-visible users, then keep active Technicians only.
+            using var usersRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                "api/auth/users");
+
+            usersRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            using var usersResponse = await client.SendAsync(usersRequest);
+
+            if (!usersResponse.IsSuccessStatusCode)
+            {
+                _error = await GetResponseErrorAsync(usersResponse);
+                return;
+            }
+
+            var users = await usersResponse.Content
+                .ReadFromJsonAsync<List<AdminUserApiDto>>();
+
+            _technicians = (users ?? [])
+                .Where(user =>
+                    user.IsActive &&
+                    string.Equals(
+                        user.Role,
+                        "Technician",
+                        StringComparison.OrdinalIgnoreCase))
+                .OrderBy(user => user.FullName)
+                .ToList();
+
+            // Load complaints eligible for assignment.
+            using var complaintsRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                "api/admin/complaints/unassigned");
+
+            complaintsRequest.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            using var complaintsResponse =
+                await client.SendAsync(complaintsRequest);
+
+            if (!complaintsResponse.IsSuccessStatusCode)
+            {
+                _error = await GetResponseErrorAsync(complaintsResponse);
+                return;
+            }
+
+            _complaints = await complaintsResponse.Content
+                .ReadFromJsonAsync<List<UnassignedComplaintApiDto>>() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not connect to the API. Make sure it is running.";
+        }
+        catch (TaskCanceledException)
+        {
+            _error = "The API request timed out. Please try again.";
+        }
+        catch (JsonException)
+        {
+            _error = "The API returned an invalid response.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task AssignAsync(UnassignedComplaintApiDto complaint)
+    {
+        if (_assigningComplaintId.HasValue ||
+            complaint.SelectedTechnicianId <= 0)
+        {
+            return;
+        }
+
+        _assigningComplaintId = complaint.ComplaintId;
+
+        try
+        {
+            var token = await GetAccessTokenAsync();
+
+            if (token is null)
+            {
+                Snackbar.Add(
+                    _error ?? "Your session is unavailable.",
+                    Severity.Error);
+                return;
+            }
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"api/admin/complaints/{complaint.ComplaintId}/assign")
+            {
+                Content = JsonContent.Create(
+                    new AssignTechnicianApiRequest
+                    {
+                        TechnicianId = complaint.SelectedTechnicianId
+                    })
+            };
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await client.SendAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.NoContent)
+            {
+                var technician = _technicians.FirstOrDefault(
+                    user => user.UserId == complaint.SelectedTechnicianId);
+
+                Snackbar.Add(
+                    $"{complaint.TicketNumber} assigned to " +
+                    $"{technician?.FullName ?? "Technician"}.",
+                    Severity.Success);
+
+                _complaints.Remove(complaint);
+                return;
+            }
+
+            Snackbar.Add(
+                await GetResponseErrorAsync(response),
+                Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add(
+                "Could not connect to the API.",
+                Severity.Error);
+        }
+        catch (TaskCanceledException)
+        {
+            Snackbar.Add(
+                "The assignment request timed out.",
+                Severity.Error);
+        }
+        finally
+        {
+            _assigningComplaintId = null;
+        }
+    }
+
+    private async Task<string?> GetAccessTokenAsync()
+    {
+        var authState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        var sessionId = authState.User
+            .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+            ?.Value;
+
+        if (string.IsNullOrWhiteSpace(sessionId) ||
+            !TokenStore.TryGet(sessionId, out var session) ||
+            session is null)
+        {
+            _error = "Your session is unavailable. Please sign in again.";
+            return null;
+        }
+
+        if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            _error = "Your API token has expired. Please sign in again.";
+            return null;
+        }
+
+        return session.AccessToken;
+    }
+
+    private static async Task<string> GetResponseErrorAsync(
+        HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+
+                if (document.RootElement.TryGetProperty(
+                        "message",
+                        out var message))
+                {
+                    return message.GetString()
+                        ?? "The API rejected the request.";
+                }
+            }
+            catch (JsonException)
+            {
+                // Use the status-code fallback below.
+            }
+        }
+
+        return response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized =>
+                "Your API session has expired. Please sign in again.",
+
+            HttpStatusCode.Forbidden =>
+                "The API denied this operation. An Admin role is required.",
+
+            HttpStatusCode.NotFound =>
+                "The requested resource could not be found.",
+
+            HttpStatusCode.Conflict =>
+                "The complaint could not be assigned in its current state.",
+
+            _ =>
+                $"The API returned HTTP {(int)response.StatusCode}."
+        };
+    }
+}

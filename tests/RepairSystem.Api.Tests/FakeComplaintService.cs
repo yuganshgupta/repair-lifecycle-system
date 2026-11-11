@@ -25,6 +25,20 @@ public sealed class FakeComplaintService : IComplaintService
     public IReadOnlyList<CustomerComplaintDto> Complaints { get; set; }
         = Array.Empty<CustomerComplaintDto>();
 
+    public int AssignmentCallCount { get; private set; }
+
+    public int? LastAssignedComplaintId { get; private set; }
+
+    public int? LastAssignedTechnicianId { get; private set; }
+
+    public int? LastAssigningAdminId { get; private set; }
+
+    public ComplaintAssignmentResult AssignmentResult { get; set; }
+        = ComplaintAssignmentResult.Assigned;
+
+    public IReadOnlyList<AdminUnassignedComplaintDto> UnassignedComplaints { get; set; }
+        = Array.Empty<AdminUnassignedComplaintDto>();
+
     public CustomerComplaintDto CreatedComplaint { get; set; } = new()
     {
         ComplaintId = 101,
@@ -38,8 +52,8 @@ public sealed class FakeComplaintService : IComplaintService
         UpdatedAt = DateTime.UtcNow
     };
 
-    public Task<IReadOnlyList<CustomerComplaintDto>>
-        GetCustomerComplaintsAsync(int customerId)
+    public Task<IReadOnlyList<CustomerComplaintDto>> GetCustomerComplaintsAsync(
+        int customerId)
     {
         CallCount++;
         LastRequestedCustomerId = customerId;
@@ -58,12 +72,31 @@ public sealed class FakeComplaintService : IComplaintService
         return Task.FromResult(CreatedComplaint);
     }
 
-    public Task<IReadOnlyList<TechnicianComplaintDto>>
-    GetTechnicianComplaintsAsync(int technicianId)
+    public Task<IReadOnlyList<TechnicianComplaintDto>> GetTechnicianComplaintsAsync(
+        int technicianId)
     {
         TechnicianCallCount++;
         LastRequestedTechnicianId = technicianId;
 
         return Task.FromResult(TechnicianComplaints);
+    }
+
+    public Task<ComplaintAssignmentResult> AssignTechnicianAsync(
+        int complaintId,
+        int technicianId,
+        int assignedByAdminId)
+    {
+        AssignmentCallCount++;
+
+        LastAssignedComplaintId = complaintId;
+        LastAssignedTechnicianId = technicianId;
+        LastAssigningAdminId = assignedByAdminId;
+
+        return Task.FromResult(AssignmentResult);
+    }
+
+    public Task<IReadOnlyList<AdminUnassignedComplaintDto>> GetUnassignedComplaintsAsync()
+    {
+        return Task.FromResult(UnassignedComplaints);
     }
 }
