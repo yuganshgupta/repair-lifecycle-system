@@ -214,4 +214,84 @@ public sealed class ComplaintService : IComplaintService
             })
             .ToList();
     }
+
+
+    public async Task<TechnicianStatusUpdateResult>
+        UpdateTechnicianComplaintStatusAsync(
+            int complaintId,
+            int technicianId,
+            ComplaintStatus newStatus)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(complaintId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(technicianId);
+
+        if (!Enum.IsDefined(newStatus))
+        {
+            return TechnicianStatusUpdateResult.InvalidStatus;
+        }
+
+        var complaint =
+            await _complaintRepository.GetByIdAsync(complaintId);
+
+        if (complaint is null)
+        {
+            return TechnicianStatusUpdateResult.ComplaintNotFound;
+        }
+
+        // A Technician can only update their own assigned complaints.
+        if (complaint.AssignedTechnicianId != technicianId)
+        {
+            return TechnicianStatusUpdateResult
+                .ComplaintNotAssignedToTechnician;
+        }
+
+        // Technician-specific permissions.
+        // Quote approval and cancellation are not Technician actions.
+        var allowedForTechnician =
+            (complaint.Status, newStatus) switch
+            {
+                (ComplaintStatus.Assigned, ComplaintStatus.InDiagnosis)
+                    => true,
+
+                (ComplaintStatus.Approved, ComplaintStatus.InRepair)
+                    => true,
+
+                (ComplaintStatus.InRepair, ComplaintStatus.Completed)
+                    => true,
+
+                _ => false
+            };
+
+        if (!allowedForTechnician)
+        {
+            return TechnicianStatusUpdateResult.InvalidTransition;
+        }
+
+        var previousStatus = complaint.Status;
+
+        try
+        {
+            complaint.ChangeStatus(newStatus);
+        }
+        catch (InvalidOperationException)
+        {
+            return TechnicianStatusUpdateResult.InvalidTransition;
+        }
+
+        var history = new ComplaintStatusHistory
+        {
+            ComplaintId = complaint.ComplaintId,
+            PreviousStatus = previousStatus,
+            NewStatus = complaint.Status,
+            ChangedByUserId = technicianId,
+            ChangedAt = complaint.UpdatedAt
+        };
+
+        await _complaintRepository.SaveStatusChangeAsync(
+            complaint,
+            history);
+
+        return TechnicianStatusUpdateResult.Updated;
+    }
+
 }

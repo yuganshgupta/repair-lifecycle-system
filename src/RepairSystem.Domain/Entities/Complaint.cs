@@ -1,4 +1,5 @@
-﻿using RepairSystem.Domain.Enums;
+﻿
+using RepairSystem.Domain.Enums;
 
 namespace RepairSystem.Domain.Entities;
 
@@ -44,24 +45,64 @@ public class Complaint
         AssignedTechnicianId = technicianId;
 
         ChangeStatus(ComplaintStatus.Assigned);
-
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void ChangeStatus(ComplaintStatus newStatus)
     {
-        if(Status == ComplaintStatus.Submitted && newStatus == ComplaintStatus.Completed)
+        if (!Enum.IsDefined(newStatus))
         {
-            throw new InvalidOperationException("You cant directly change the ticket from submitted to completed");
+            throw new ArgumentOutOfRangeException(
+                nameof(newStatus),
+                newStatus,
+                "The requested complaint status is invalid.");
         }
-        if (Status == ComplaintStatus.Approved && newStatus == ComplaintStatus.Cancelled)
+
+        if (newStatus == Status)
         {
-            throw new InvalidOperationException("You cant directly change the ticket from Approved to Cancelled");
+            throw new InvalidOperationException(
+                "The complaint is already in this status.");
+        }
+
+        if (!IsTransitionAllowed(Status, newStatus))
+        {
+            throw new InvalidOperationException(
+                $"Transition from {Status} to {newStatus} is not allowed.");
         }
 
         Status = newStatus;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static bool IsTransitionAllowed(
+        ComplaintStatus currentStatus,
+        ComplaintStatus newStatus)
+    {
+        return (currentStatus, newStatus) switch
+        {
+            (ComplaintStatus.Submitted, ComplaintStatus.Assigned)
+                => true,
+
+            (ComplaintStatus.Assigned, ComplaintStatus.InDiagnosis)
+                => true,
+
+            (ComplaintStatus.InDiagnosis, ComplaintStatus.QuotePending)
+                => true,
+
+            (ComplaintStatus.QuotePending,
+                ComplaintStatus.Approved or ComplaintStatus.Cancelled)
+                => true,
+
+            (ComplaintStatus.Approved, ComplaintStatus.InRepair)
+                => true,
+
+            (ComplaintStatus.InRepair, ComplaintStatus.Completed)
+                => true,
+
+            _ => false
+        };
     }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

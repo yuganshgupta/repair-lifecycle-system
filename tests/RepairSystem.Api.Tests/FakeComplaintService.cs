@@ -1,5 +1,6 @@
 ﻿using RepairSystem.Application.Contracts.Complaints;
 using RepairSystem.Application.Interfaces.Complaints;
+using RepairSystem.Domain.Enums;
 
 namespace RepairSystem.Api.Tests;
 
@@ -32,6 +33,17 @@ public sealed class FakeComplaintService : IComplaintService
     public int? LastAssignedTechnicianId { get; private set; }
 
     public int? LastAssigningAdminId { get; private set; }
+
+    public int StatusUpdateCallCount { get; private set; }
+
+    public int? LastStatusUpdateComplaintId { get; private set; }
+
+    public int? LastStatusUpdateTechnicianId { get; private set; }
+
+    public ComplaintStatus? LastRequestedStatus { get; private set; }
+
+    public TechnicianStatusUpdateResult StatusUpdateResult { get; set; } =
+        TechnicianStatusUpdateResult.Updated;
 
     public ComplaintAssignmentResult AssignmentResult { get; set; }
         = ComplaintAssignmentResult.Assigned;
@@ -98,5 +110,19 @@ public sealed class FakeComplaintService : IComplaintService
     public Task<IReadOnlyList<AdminUnassignedComplaintDto>> GetUnassignedComplaintsAsync()
     {
         return Task.FromResult(UnassignedComplaints);
+    }
+
+    public Task<TechnicianStatusUpdateResult>
+    UpdateTechnicianComplaintStatusAsync(
+        int complaintId,
+        int technicianId,
+        ComplaintStatus newStatus)
+    {
+        StatusUpdateCallCount++;
+        LastStatusUpdateComplaintId = complaintId;
+        LastStatusUpdateTechnicianId = technicianId;
+        LastRequestedStatus = newStatus;
+
+        return Task.FromResult(StatusUpdateResult);
     }
 }

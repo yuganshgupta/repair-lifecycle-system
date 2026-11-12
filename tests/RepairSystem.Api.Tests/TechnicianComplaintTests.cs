@@ -1,10 +1,11 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using Microsoft.IdentityModel.Tokens;
+using RepairSystem.Application.Contracts.Complaints;
+using RepairSystem.Domain.Enums;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
-using Microsoft.IdentityModel.Tokens;
-using RepairSystem.Application.Contracts.Complaints;
 
 namespace RepairSystem.Api.Tests;
 
@@ -152,6 +153,89 @@ public sealed class TechnicianComplaintTests
             factory.FakeComplaintService.TechnicianCallCount);
     }
 
+
+    [TestMethod]
+    public async Task UpdateComplaintStatus_Returns401_WhenTokenIsMissing()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PatchAsJsonAsync(
+            $"{Endpoint}/101/status",
+            new UpdateTechnicianComplaintStatusRequestDto
+            {
+                NewStatus = ComplaintStatus.InDiagnosis
+            });
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.AreEqual(0, factory.FakeComplaintService.StatusUpdateCallCount);
+    }
+
+    [TestMethod]
+    public async Task UpdateComplaintStatus_Returns403_WhenCallerIsCustomer()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = CreateAuthenticatedClient(
+            factory, "Customer", "200");
+
+        var response = await client.PatchAsJsonAsync(
+            $"{Endpoint}/101/status",
+            new UpdateTechnicianComplaintStatusRequestDto
+            {
+                NewStatus = ComplaintStatus.InDiagnosis
+            });
+
+        Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.AreEqual(0, factory.FakeComplaintService.StatusUpdateCallCount);
+    }
+
+    [TestMethod]
+    public async Task UpdateComplaintStatus_Returns204_WhenTechnicianUpdatesOwnComplaint()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = CreateAuthenticatedClient(
+            factory, "Technician", "200");
+
+        var response = await client.PatchAsJsonAsync(
+            $"{Endpoint}/101/status",
+            new UpdateTechnicianComplaintStatusRequestDto
+            {
+                NewStatus = ComplaintStatus.InDiagnosis
+            });
+
+        Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
+
+        Assert.AreEqual(1, factory.FakeComplaintService.StatusUpdateCallCount);
+        Assert.AreEqual(101,
+            factory.FakeComplaintService.LastStatusUpdateComplaintId);
+        Assert.AreEqual(200,
+            factory.FakeComplaintService.LastStatusUpdateTechnicianId);
+        Assert.AreEqual(
+            ComplaintStatus.InDiagnosis,
+            factory.FakeComplaintService.LastRequestedStatus);
+    }
+
+    [TestMethod]
+    public async Task UpdateComplaintStatus_Returns409_WhenTransitionIsInvalid()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = CreateAuthenticatedClient(
+            factory, "Technician", "200");
+
+        factory.FakeComplaintService.StatusUpdateResult =
+            TechnicianStatusUpdateResult.InvalidTransition;
+
+        var response = await client.PatchAsJsonAsync(
+            $"{Endpoint}/101/status",
+            new UpdateTechnicianComplaintStatusRequestDto
+            {
+                NewStatus = ComplaintStatus.Completed
+            });
+
+        Assert.AreEqual(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+
     private static HttpClient CreateAuthenticatedClient(
         RepairApiFactory factory,
         string role,
@@ -191,4 +275,6 @@ public sealed class TechnicianComplaintTests
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+
 }

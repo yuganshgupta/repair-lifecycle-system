@@ -19,4 +19,8 @@ public interface IComplaintRepository
         ComplaintStatusHistory history);
 
     Task<IReadOnlyList<Complaint>> GetUnassignedAsync();
+
+    Task SaveStatusChangeAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history);
 }

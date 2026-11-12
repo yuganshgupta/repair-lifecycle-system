@@ -1,103 +1,154 @@
 ﻿@page "/login"
 @rendermode InteractiveServer
 
-<PageTitle>Sign In</PageTitle>
+<PageTitle>Sign In | Repair Lifecycle</PageTitle>
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-4">
+<div class="auth-page">
+
+    <header class="auth-header">
+        <div class="container auth-header-inner">
+
+            <a href="/" class="rl-brand">
+                <span class="rl-brand-mark">RL</span>
+
+                <span class="rl-brand-name">
+                    Repair Lifecycle
+                    <small>MANAGEMENT SYSTEM</small>
+                </span>
+            </a>
+
+            <a href="/" class="auth-home-link">
+                Back to home
+            </a>
+
+        </div>
+    </header>
+
+    <main class="auth-content">
+
+        <section class="auth-card">
+
             <AuthorizeView>
                 <Authorized Context="authState">
-                    <h2 class="mb-2">You're signed in</h2>
-                    <p class="text-muted">
-                        Welcome, @authState.User.Identity?.Name.
-                    </p>
 
-                    <a href="/dashboard" class="btn btn-primary w-100 mb-3">
+                    <div class="auth-heading">
+                        <h1>You're signed in</h1>
+                        <p>
+                            Welcome, @authState.User.Identity?.Name.
+                        </p>
+                    </div>
+
+                    <a href="/dashboard"
+                       class="btn btn-primary w-100 mb-3">
                         Open dashboard
                     </a>
 
                     <form method="post" action="/auth/logout">
                         <AntiforgeryToken />
-                        <button type="submit" class="btn btn-outline-secondary w-100">
+
+                        <button type="submit"
+                                class="btn btn-outline-secondary w-100">
                             Sign out
                         </button>
                     </form>
+
                 </Authorized>
 
                 <NotAuthorized>
-                    <h2 class="mb-2">Sign in</h2>
-                    <p class="text-muted mb-4">
-                        Sign in to your Repair Lifecycle account.
-                    </p>
+
+                    <div class="auth-heading">
+                        <h1>Sign in</h1>
+                        <p>
+                            Access your Repair Lifecycle account.
+                        </p>
+                    </div>
 
                     @if (LoggedOut == "true")
                     {
-                        <div class="alert alert-success">
-                            You have signed out.
+                        <div class="alert alert-success" role="alert">
+                            You have signed out successfully.
                         </div>
                     }
 
                     @if (Error == "invalid")
                     {
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger" role="alert">
                             Invalid email or password.
                         </div>
                     }
                     else if (Error == "api-unavailable")
                     {
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger" role="alert">
                             Could not connect to the API. Make sure it is running.
                         </div>
                     }
                     else if (Error == "api-response")
                     {
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger" role="alert">
                             The API returned an unexpected response.
                         </div>
                     }
                     else if (Error == "api")
                     {
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger" role="alert">
                             Login failed because the API returned an error.
                         </div>
                     }
 
                     <form method="post" action="/auth/login">
+
                         <AntiforgeryToken />
 
                         <div class="mb-3">
                             <label for="email" class="form-label">
                                 Email address
                             </label>
+
                             <input id="email"
                                    name="email"
                                    class="form-control"
                                    type="email"
                                    autocomplete="username"
+                                   placeholder="Enter your email address"
                                    required />
                         </div>
 
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="password" class="form-label">
                                 Password
                             </label>
+
                             <input id="password"
                                    name="password"
                                    class="form-control"
                                    type="password"
                                    autocomplete="current-password"
+                                   placeholder="Enter your password"
                                    required />
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100">
+                        <button type="submit"
+                                class="btn btn-primary w-100">
                             Sign in
                         </button>
+
                     </form>
+
+                    <div class="auth-form-note">
+                        Sign in using your registered account credentials.
+                    </div>
+
                 </NotAuthorized>
             </AuthorizeView>
-        </div>
-    </div>
+
+        </section>
+
+    </main>
+
+    <footer class="auth-footer">
+        Repair Lifecycle Management System
+    </footer>
+
 </div>
 
 @code {

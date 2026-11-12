@@ -16,360 +16,371 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<div class="container mt-4">
-    <AuthorizeView>
-        <Authorized Context="authState">
-            <h1 class="mb-2">Dashboard</h1>
-            <p class="text-muted">
-                Welcome, @authState.User.Identity?.Name.
-            </p>
-
-            <div class="mb-4">
-                <span class="badge bg-secondary">
-                    @(authState.User.FindFirst(
-                        System.Security.Claims.ClaimTypes.Role)?.Value)
-                </span>
-            </div>
-
-            @if (authState.User.IsInRole("Customer"))
-            {
-                <section class="mb-4">
-
-                    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="rl-dashboard">
+    <div class="container">
+        <AuthorizeView>
+            <Authorized Context="authState">
+                <header class="rl-dashboard-header">
+                    <div class="rl-dashboard-header-main">
                         <div>
-                            <h2 class="h4">My Repair Requests</h2>
-                            <p class="text-muted">
-                                Track the progress of your submitted repair requests.
+                            <h1>Dashboard</h1>
+                            <p class="rl-dashboard-subtitle">
+                                Welcome, @authState.User.Identity?.Name.
                             </p>
                         </div>
 
-                        <button type="button"
-                                class="btn btn-primary"
-                                @onclick="OpenComplaintForm">
-                            <i class="bi bi-plus-lg me-1"></i>
-                            New Repair Request
-                        </button>
+                        <span class="rl-dashboard-role-badge">
+                            @(authState.User.FindFirst(
+                                System.Security.Claims.ClaimTypes.Role)?.Value)
+                        </span>
                     </div>
+                </header>
 
-                    @if (!string.IsNullOrWhiteSpace(_complaintSuccessMessage))
-                    {
-                        <div class="alert alert-success" role="alert">
-                            @_complaintSuccessMessage
-                        </div>
-                    }
+                @if (authState.User.IsInRole("Customer"))
+                {
+                    <section class="rl-dashboard-section">
 
-                    @if (_showComplaintForm)
-                    {
-                        <div class="card mb-4">
-                            <div class="card-header bg-white py-3">
-                                <h3 class="h5 mb-0">Submit a Repair Request</h3>
-                            </div>
-
-                            <div class="card-body">
-
-                                @if (!string.IsNullOrWhiteSpace(_complaintFormError))
-                                {
-                                    <div class="alert alert-danger">
-                                        @_complaintFormError
-                                    </div>
-                                }
-
-                                <EditForm Model="@_newComplaint"
-                                          OnValidSubmit="SubmitComplaintAsync">
-
-                                    <DataAnnotationsValidator />
-                                    <ValidationSummary />
-
-                                    <div class="row g-3">
-
-                                        <div class="col-md-6">
-                                            <label class="form-label">Device Type</label>
-                                            <InputText class="form-control"
-                                                       @bind-Value="_newComplaint.DeviceType"
-                                                       placeholder="e.g. Laptop" />
-                                            <ValidationMessage For="@(() => _newComplaint.DeviceType)" />
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label">Brand</label>
-                                            <InputText class="form-control"
-                                                       @bind-Value="_newComplaint.DeviceBrand"
-                                                       placeholder="e.g. Dell" />
-                                            <ValidationMessage For="@(() => _newComplaint.DeviceBrand)" />
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label">Model</label>
-                                            <InputText class="form-control"
-                                                       @bind-Value="_newComplaint.DeviceModel"
-                                                       placeholder="e.g. Inspiron 15" />
-                                            <ValidationMessage For="@(() => _newComplaint.DeviceModel)" />
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label">
-                                                Serial Number (Optional)
-                                            </label>
-                                            <InputText class="form-control"
-                                                       @bind-Value="_newComplaint.SerialNumber"
-                                                       placeholder="Enter serial number" />
-                                            <ValidationMessage For="@(() => _newComplaint.SerialNumber)" />
-                                        </div>
-
-                                        <div class="col-12">
-                                            <label class="form-label">Describe the Issue</label>
-                                            <InputTextArea class="form-control"
-                                                           rows="4"
-                                                           @bind-Value="_newComplaint.IssueDescription"
-                                                           placeholder="Describe the problem with your device..." />
-                                            <ValidationMessage For="@(() => _newComplaint.IssueDescription)" />
-                                        </div>
-
-                                        <div class="col-12">
-                                            <div class="form-check">
-                                                <InputCheckbox id="claimedWarranty"
-                                                               class="form-check-input"
-                                                               @bind-Value="_newComplaint.ClaimedWarranty" />
-
-                                                <label class="form-check-label"
-                                                       for="claimedWarranty">
-                                                    This device is covered under warranty.
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-12 d-flex gap-2">
-                                            <button type="submit"
-                                                    class="btn btn-primary"
-                                                    disabled="@_isSubmittingComplaint">
-
-                                                @if (_isSubmittingComplaint)
-                                                {
-                                                    <span class="spinner-border spinner-border-sm me-1"></span>
-                                                    <span>Submitting...</span>
-                                                }
-                                                else
-                                                {
-                                                    <span>Submit Request</span>
-                                                }
-                                            </button>
-
-                                            <button type="button"
-                                                    class="btn btn-outline-secondary"
-                                                    @onclick="CancelComplaintForm"
-                                                    disabled="@_isSubmittingComplaint">
-                                                Cancel
-                                            </button>
-                                        </div>
-
-                                    </div>
-                                </EditForm>
-                            </div>
-                        </div>
-                    }
-
-                    @if (_isLoadingComplaints)
-                    {
-                        <div class="card">
-                            <div class="card-body text-center p-5">
-                                <div class="spinner-border text-primary"
-                                     role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="text-muted mt-3 mb-0">
-                                    Loading your repair requests...
+                        <div class="rl-dashboard-section-header">
+                            <div>
+                                <h2>My Repair Requests</h2>
+                                <p>
+                                    Track the progress of your submitted repair requests.
                                 </p>
                             </div>
-                        </div>
-                    }
-                    else if (!string.IsNullOrWhiteSpace(_complaintsError))
-                    {
-                        <div class="alert alert-danger" role="alert">
-                            @_complaintsError
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="row g-3 mb-4">
 
-                            <div class="col-md-4">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <p class="text-muted mb-2">Open Repairs</p>
-                                        <h3 class="mb-0">
-                                            @_customerComplaints.Count(c =>
-                                                c.Status != "Completed" &&
-                                                c.Status != "Cancelled")
-                                        </h3>
-                                    </div>
-                                </div>
+                            <div class="rl-dashboard-actions">
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        @onclick="OpenComplaintForm">
+                                    <i class="bi bi-plus-lg me-1"></i>
+                                    New Repair Request
+                                </button>
                             </div>
-
-                            <div class="col-md-4">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <p class="text-muted mb-2">
-                                            Awaiting Quote
-                                        </p>
-                                        <h3 class="mb-0">
-                                            @_customerComplaints.Count(c =>
-                                                c.Status == "QuotePending")
-                                        </h3>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <p class="text-muted mb-2">
-                                            Completed Repairs
-                                        </p>
-                                        <h3 class="mb-0">
-                                            @_customerComplaints.Count(c =>
-                                                c.Status == "Completed")
-                                        </h3>
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
 
-                        <div class="card">
-                            <div class="card-header bg-white py-3">
-                                <h3 class="h5 mb-0">Repair History</h3>
+                        @if (!string.IsNullOrWhiteSpace(_complaintSuccessMessage))
+                        {
+                            <div class="alert alert-success mb-4" role="alert">
+                                @_complaintSuccessMessage
                             </div>
+                        }
 
-                            @if (_customerComplaints.Count == 0)
-                            {
-                                <div class="card-body text-center py-5">
-                                    <h4 class="h5">No repair requests yet</h4>
+                        @if (_showComplaintForm)
+                        {
+                            <div class="card rl-dashboard-card mb-4">
+                                <div class="card-header rl-dashboard-card-header">
+                                    <h3>Submit a Repair Request</h3>
+                                </div>
 
-                                    <p class="text-muted mb-0">
-                                        Your submitted repair requests will appear here.
+                                <div class="card-body rl-dashboard-card-body">
+
+                                    @if (!string.IsNullOrWhiteSpace(_complaintFormError))
+                                    {
+                                        <div class="alert alert-danger">
+                                            @_complaintFormError
+                                        </div>
+                                    }
+
+                                    <EditForm Model="@_newComplaint"
+                                              OnValidSubmit="SubmitComplaintAsync">
+
+                                        <DataAnnotationsValidator />
+                                        <ValidationSummary />
+
+                                        <div class="row g-3">
+
+                                            <div class="col-md-6">
+                                                <label class="form-label">Device Type</label>
+                                                <InputText class="form-control"
+                                                           @bind-Value="_newComplaint.DeviceType"
+                                                           placeholder="e.g. Laptop" />
+                                                <ValidationMessage For="@(() => _newComplaint.DeviceType)" />
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label class="form-label">Brand</label>
+                                                <InputText class="form-control"
+                                                           @bind-Value="_newComplaint.DeviceBrand"
+                                                           placeholder="e.g. Dell" />
+                                                <ValidationMessage For="@(() => _newComplaint.DeviceBrand)" />
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label class="form-label">Model</label>
+                                                <InputText class="form-control"
+                                                           @bind-Value="_newComplaint.DeviceModel"
+                                                           placeholder="e.g. Inspiron 15" />
+                                                <ValidationMessage For="@(() => _newComplaint.DeviceModel)" />
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label class="form-label">
+                                                    Serial Number (Optional)
+                                                </label>
+                                                <InputText class="form-control"
+                                                           @bind-Value="_newComplaint.SerialNumber"
+                                                           placeholder="Enter serial number" />
+                                                <ValidationMessage For="@(() => _newComplaint.SerialNumber)" />
+                                            </div>
+
+                                            <div class="col-12">
+                                                <label class="form-label">Describe the Issue</label>
+                                                <InputTextArea class="form-control"
+                                                               rows="4"
+                                                               @bind-Value="_newComplaint.IssueDescription"
+                                                               placeholder="Describe the problem with your device..." />
+                                                <ValidationMessage For="@(() => _newComplaint.IssueDescription)" />
+                                            </div>
+
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <InputCheckbox id="claimedWarranty"
+                                                                   class="form-check-input"
+                                                                   @bind-Value="_newComplaint.ClaimedWarranty" />
+
+                                                    <label class="form-check-label"
+                                                           for="claimedWarranty">
+                                                        This device is covered under warranty.
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-12 rl-dashboard-actions">
+                                                <button type="submit"
+                                                        class="btn btn-primary"
+                                                        disabled="@_isSubmittingComplaint">
+
+                                                    @if (_isSubmittingComplaint)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                                        <span>Submitting...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Submit Request</span>
+                                                    }
+                                                </button>
+
+                                                <button type="button"
+                                                        class="btn btn-outline-secondary"
+                                                        @onclick="CancelComplaintForm"
+                                                        disabled="@_isSubmittingComplaint">
+                                                    Cancel
+                                                </button>
+                                            </div>
+
+                                        </div>
+                                    </EditForm>
+                                </div>
+                            </div>
+                        }
+
+                        @if (_isLoadingComplaints)
+                        {
+                            <div class="card rl-dashboard-card">
+                                <div class="card-body rl-dashboard-empty">
+                                    <div class="spinner-border text-primary"
+                                         role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="text-muted mt-3 mb-0">
+                                        Loading your repair requests...
                                     </p>
                                 </div>
-                            }
-                            else
-                            {
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Ticket Number</th>
-                                                <th>Device</th>
-                                                <th>Issue</th>
-                                                <th>Submitted</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(_complaintsError))
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @_complaintsError
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row g-3 mb-4">
 
-                                        <tbody>
-                                            @foreach (var complaint in _customerComplaints
-                                                .OrderByDescending(c => c.CreatedAt))
-                                            {
-                                                <tr>
-                                                    <td>
-                                                        <strong>
-                                                            @complaint.TicketNumber
-                                                        </strong>
-                                                    </td>
-
-                                                    <td>
-                                                        <div>
-                                                            @GetDeviceName(complaint)
-                                                        </div>
-                                                        <small class="text-muted">
-                                                            @complaint.DeviceType
-                                                        </small>
-                                                    </td>
-
-                                                    <td>
-                                                        @complaint.IssueDescription
-                                                    </td>
-
-                                                    <td>
-                                                        @complaint.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
-                                                    </td>
-
-                                                    <td>
-                                                        <span class="badge @GetStatusBadgeClass(complaint.Status)">
-                                                            @FormatStatus(complaint.Status)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
+                                <div class="col-md-4">
+                                    <div class="card rl-dashboard-card rl-dashboard-stat-card h-100">
+                                        <div class="card-body rl-dashboard-card-body">
+                                            <p class="rl-dashboard-stat-label">Open Repairs</p>
+                                            <h3 class="rl-dashboard-stat-value">
+                                                @_customerComplaints.Count(c =>
+                                                    c.Status != "Completed" &&
+                                                    c.Status != "Cancelled")
+                                            </h3>
+                                        </div>
+                                    </div>
                                 </div>
-                            }
+
+                                <div class="col-md-4">
+                                    <div class="card rl-dashboard-card rl-dashboard-stat-card h-100">
+                                        <div class="card-body rl-dashboard-card-body">
+                                            <p class="rl-dashboard-stat-label">
+                                                Awaiting Quote
+                                            </p>
+                                            <h3 class="rl-dashboard-stat-value">
+                                                @_customerComplaints.Count(c =>
+                                                    c.Status == "QuotePending")
+                                            </h3>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card rl-dashboard-card rl-dashboard-stat-card h-100">
+                                        <div class="card-body rl-dashboard-card-body">
+                                            <p class="rl-dashboard-stat-label">
+                                                Completed Repairs
+                                            </p>
+                                            <h3 class="rl-dashboard-stat-value">
+                                                @_customerComplaints.Count(c =>
+                                                    c.Status == "Completed")
+                                            </h3>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="card rl-dashboard-card">
+                                <div class="card-header rl-dashboard-card-header">
+                                    <h3>Repair History</h3>
+                                </div>
+
+                                @if (_customerComplaints.Count == 0)
+                                {
+                                    <div class="card-body rl-dashboard-empty">
+                                        <h4>No repair requests yet</h4>
+
+                                        <p>
+                                            Your submitted repair requests will appear here.
+                                        </p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0 rl-dashboard-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Ticket Number</th>
+                                                    <th>Device</th>
+                                                    <th>Issue</th>
+                                                    <th>Submitted</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+
+                                            <tbody>
+                                                @foreach (var complaint in _customerComplaints
+                                                    .OrderByDescending(c => c.CreatedAt))
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            <strong>
+                                                                @complaint.TicketNumber
+                                                            </strong>
+                                                        </td>
+
+                                                        <td>
+                                                            <div class="rl-dashboard-device-name">
+                                                                @GetDeviceName(complaint)
+                                                            </div>
+                                                            <small class="text-muted">
+                                                                @complaint.DeviceType
+                                                            </small>
+                                                        </td>
+
+                                                        <td>
+                                                            @complaint.IssueDescription
+                                                        </td>
+
+                                                        <td>
+                                                            @complaint.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
+                                                        </td>
+
+                                                        <td>
+                                                            <span class="badge rl-dashboard-status-badge @GetStatusBadgeClass(complaint.Status)">
+                                                                @FormatStatus(complaint.Status)
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                    </section>
+                }
+
+                @if (authState.User.IsInRole("Technician"))
+                {
+                    <section class="rl-dashboard-section">
+                        <div class="card rl-dashboard-card">
+                            <div class="card-header rl-dashboard-card-header">
+                                <h2>Technician dashboard</h2>
+                            </div>
+                            <div class="card-body rl-dashboard-card-body">
+                                <p class="rl-dashboard-card-text">
+                                    Review the repair requests assigned to your account.
+                                </p>
+
+                                <div class="rl-dashboard-actions">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               Href="/technician/complaints">
+                                        View assigned repairs
+                                    </MudButton>
+                                </div>
+                            </div>
                         </div>
-                    }
+                    </section>
+                }
 
-                </section>
-            }
+                @if (authState.User.IsInRole("Admin"))
+                {
+                    <section class="rl-dashboard-section">
+                        <div class="card rl-dashboard-card">
+                            <div class="card-header rl-dashboard-card-header">
+                                <h2>Admin dashboard</h2>
+                            </div>
+                            <div class="card-body rl-dashboard-card-body">
+                                <p class="rl-dashboard-card-text">
+                                    Manage users and oversee repair assignments.
+                                </p>
 
-            @if (authState.User.IsInRole("Technician"))
-            {
-                <section class="card mb-3">
-                    <div class="card-body">
-                        <h2 class="h5">Technician dashboard</h2>
+                                <div class="rl-dashboard-actions">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               Href="/admin/users">
+                                        Manage user accounts
+                                    </MudButton>
 
-                        <p>
-                            Review the repair requests assigned to your account.
-                        </p>
-
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   Href="/technician/complaints">
-                            View assigned repairs
-                        </MudButton>
-                    </div>
-                </section>
-            }
-
-            @if (authState.User.IsInRole("Admin"))
-            {
-                <section class="card mb-3">
-                    <div class="card-body">
-                        <h2 class="h5">Admin dashboard</h2>
-
-                        <p>
-                            Manage users and oversee repair assignments.
-                        </p>
-
-                        <div class="d-flex flex-wrap gap-2">
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       Href="/admin/users">
-                                Manage user accounts
-                            </MudButton>
-
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Primary"
-                                       Href="/admin/assignments">
-                                Assign complaints
-                            </MudButton>
-
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.Terminal"
-                                       Href="/admin/system-logs">
-                                System logs
-                            </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               Href="/admin/assignments">
+                                        Assign complaints
+                                    </MudButton>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </section>
-            }
+                    </section>
+                }
 
-            <form method="post" action="/auth/logout">
-                <AntiforgeryToken />
-                <button type="submit" class="btn btn-outline-secondary">
-                    Sign out
-                </button>
-            </form>
-        </Authorized>
-    </AuthorizeView>
+                <div class="rl-dashboard-footer">
+                    <form method="post" action="/auth/logout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn btn-outline-secondary">
+                            Sign out
+                        </button>
+                    </form>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </div>
 </div>
 
 @code {

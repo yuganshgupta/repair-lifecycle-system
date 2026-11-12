@@ -12,6 +12,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IApiTokenSessionStore TokenStore
+@inject ISnackbar Snackbar
 
 <MudProviders />
 
@@ -202,6 +203,32 @@
                                         </div>
                                     }
                                 </div>
+
+                                @if (GetNextTechnicianStatus(complaint.Status) is int nextStatus)
+                                {
+                                    <div class="d-flex justify-content-end border-top pt-3 mt-3">
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Disabled="@_updatingComplaintId.HasValue"
+                                                   OnClick="@(() => UpdateComplaintStatusAsync(
+                                                       complaint,
+                                                       nextStatus))">
+
+                                            @if (_updatingComplaintId == complaint.ComplaintId)
+                                            {
+                                                <MudProgressCircular Indeterminate="true"
+                                                                     Size="Size.Small"
+                                                                     Class="me-2" />
+                                                <span>Updating...</span>
+                                            }
+                                            else
+                                            {
+                                                @GetTechnicianActionLabel(complaint.Status)
+                                            }
+
+                                        </MudButton>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -216,6 +243,7 @@
 
     private bool _isLoading = true;
     private string? _error;
+    private int? _updatingComplaintId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -269,6 +297,79 @@
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task UpdateComplaintStatusAsync(
+        TechnicianComplaintApiDto complaint,
+        int newStatus)
+    {
+        if (_updatingComplaintId.HasValue)
+            return;
+
+        _updatingComplaintId = complaint.ComplaintId;
+
+        try
+        {
+            var token = await GetAccessTokenAsync();
+
+            if (token is null)
+            {
+                Snackbar.Add(
+                    _error ?? "Your session is unavailable.",
+                    Severity.Error);
+
+                return;
+            }
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Patch,
+                $"api/technician/complaints/{complaint.ComplaintId}/status")
+            {
+                Content = JsonContent.Create(new
+                {
+                    newStatus
+                })
+            };
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await client.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await GetStatusUpdateErrorAsync(response);
+
+                Snackbar.Add(error, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(
+                $"{complaint.TicketNumber} updated to " +
+                $"{GetTargetStatusLabel(newStatus)}.",
+                Severity.Success);
+
+            // Reload the authoritative list from the API.
+            await LoadComplaintsAsync();
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add(
+                "Could not connect to the API.",
+                Severity.Error);
+        }
+        catch (TaskCanceledException)
+        {
+            Snackbar.Add(
+                "The status update request timed out.",
+                Severity.Error);
+        }
+        finally
+        {
+            _updatingComplaintId = null;
         }
     }
 
@@ -334,6 +435,86 @@
             _ =>
                 $"Could not load assigned repairs. API returned " +
                 $"HTTP {(int)response.StatusCode}."
+        };
+    }
+
+    private static async Task<string> GetStatusUpdateErrorAsync(
+        HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+
+                if (document.RootElement.TryGetProperty(
+                        "message",
+                        out var message))
+                {
+                    return message.GetString()
+                        ?? "The status update was rejected.";
+                }
+            }
+            catch (JsonException)
+            {
+                // Use the HTTP status fallback.
+            }
+        }
+
+        return response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized =>
+                "Your API session has expired. Please sign in again.",
+
+            HttpStatusCode.Forbidden =>
+                "You are not authorized to update this repair.",
+
+            HttpStatusCode.NotFound =>
+                "This repair is no longer assigned to your account, or it does not exist.",
+
+            HttpStatusCode.Conflict =>
+                "This repair cannot move to the requested status. Refresh and try again.",
+
+            HttpStatusCode.BadRequest =>
+                "The requested status is invalid.",
+
+            _ =>
+                $"Status update failed. HTTP {(int)response.StatusCode}."
+        };
+    }
+
+    private static int? GetNextTechnicianStatus(string status)
+    {
+        return status switch
+        {
+            "Assigned" => 2, // InDiagnosis
+            "Approved" => 5, // InRepair
+            "InRepair" => 6, // Completed
+            _ => null
+        };
+    }
+
+    private static string GetTechnicianActionLabel(string status)
+    {
+        return status switch
+        {
+            "Assigned" => "Start diagnosis",
+            "Approved" => "Start repair",
+            "InRepair" => "Mark completed",
+            _ => "Update status"
+        };
+    }
+
+    private static string GetTargetStatusLabel(int status)
+    {
+        return status switch
+        {
+            2 => "In Diagnosis",
+            5 => "In Repair",
+            6 => "Completed",
+            _ => "Updated"
         };
     }
 

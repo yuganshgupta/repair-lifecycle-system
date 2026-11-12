@@ -71,4 +71,16 @@ public sealed class ComplaintRepository : IComplaintRepository
             .OrderBy(complaint => complaint.CreatedAt)
             .ToListAsync();
     }
+
+    public async Task SaveStatusChangeAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history)
+    {
+        _context.ComplaintStatusHistories.Add(history);
+
+        // The complaint was loaded as a tracked entity.
+        // Both its status update and the history record
+        // are persisted by this single SaveChanges call.
+        await _context.SaveChangesAsync();
+    }
 }

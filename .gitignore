@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 *.swp
 
 /Admin.txt
+
+# Local-only audit report
+/ui-audit-report.txt

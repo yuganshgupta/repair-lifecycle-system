@@ -1,0 +1,154 @@
+﻿@using RepairSystem.Web.Features.Admin.Contracts
+
+<MudDialog>
+
+    <DialogContent>
+
+        <MudGrid Spacing="3">
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Timestamp
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    @(Log.TimeStamp?.ToLocalTime().ToString("F") ?? "—")
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Application
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    @(Log.Application ?? "—")
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Actor
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    @(Log.ActorUserId?.ToString() ?? "Anonymous / system")
+                    · @(Log.ActorRole ?? "—")
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Outcome
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    @(Log.Outcome ?? "—")
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Request
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    @(Log.RequestMethod ?? "—")
+                    @(Log.RequestPath ?? "—")
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    HTTP Status / Duration
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    @(Log.StatusCode?.ToString() ?? "—")
+                    · @(Log.Elapsed.HasValue
+                                            ? $"{Log.Elapsed.Value:N2} ms"
+                                            : "—")
+                </MudText>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Message
+                </MudText>
+
+                <MudPaper Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.body2"
+                             Style="overflow-wrap:anywhere;">
+                        @(Log.Message ?? "No message recorded.")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Correlation ID
+                </MudText>
+
+                <MudText Typo="Typo.body2"
+                         Style="overflow-wrap:anywhere;">
+                    @(Log.CorrelationId ?? "—")
+                </MudText>
+            </MudItem>
+
+            @if (!string.IsNullOrWhiteSpace(Log.Exception))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Error">
+                        Exception
+                    </MudText>
+
+                    <MudPaper Outlined="true" Class="pa-3">
+                        <pre class="log-detail-code">@Log.Exception</pre>
+                    </MudPaper>
+                </MudItem>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Log.Properties))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Structured Properties
+                    </MudText>
+
+                    <MudPaper Outlined="true" Class="pa-3">
+                        <pre class="log-detail-code">@Log.Properties</pre>
+                    </MudPaper>
+                </MudItem>
+            }
+
+        </MudGrid>
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+
+</MudDialog>
+
+<style>
+    .log-detail-code {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 32vh;
+        overflow: auto;
+        font-size: 0.8rem;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public SystemLogApiDto Log { get; set; } = new();
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+}

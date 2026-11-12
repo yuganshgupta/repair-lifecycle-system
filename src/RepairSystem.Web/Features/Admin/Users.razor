@@ -206,15 +206,6 @@
 
     </section>
 
-    @if (_showUserForm)
-    {
-        <UserForm @key="_userForm"
-                  Model="@_userForm"
-                  IsCreate="@(!_isEditMode)"
-                  IsSubmitting="@_isSubmitting"
-                  OnValidSubmit="RequestUserConfirmation"
-                  OnCancel="CancelUserForm" />
-    }
 </div>
 
 @code {
@@ -222,8 +213,6 @@
     {
         IsCreate = true
     };
-
-    private bool _showUserForm;
 
     private bool _isEditMode;
 
@@ -236,6 +225,8 @@
     private string _statusTargetName = string.Empty;
 
     private bool _requestedActiveStatus;
+
+    private bool _userOperationSucceeded;
 
     private bool _isSubmitting;
     private IReadOnlyList<AdminUserApiDto> _users =
@@ -274,7 +265,7 @@
                 : $"Create a {_userForm.Role} account for " +
                   $"{_userForm.FullName} ({_userForm.Email})?";
 
-    private void OpenCreateForm()
+    private Task OpenCreateForm()
     {
         _isEditMode = false;
         _editingUserId = null;
@@ -286,11 +277,10 @@
             Role = "Customer"
         };
 
-        _showUserForm = true;
-
+        return ShowUserFormDialogAsync();
     }
 
-    private void OpenEditForm(AdminUserApiDto user)
+    private Task OpenEditForm(AdminUserApiDto user)
     {
         _isEditMode = true;
         _editingUserId = user.UserId;
@@ -305,20 +295,53 @@
             IsCreate = false
         };
 
-        _showUserForm = true; 
+        return ShowUserFormDialogAsync();
     }
 
-    private void CancelUserForm()
+    private async Task ShowUserFormDialogAsync()
     {
-        _showUserForm = false;
+        var isCreate = !_isEditMode;
 
-        _isEditMode = false;
-        _editingUserId = null;
+        var parameters = new DialogParameters<UserFormDialog>
+        {
+            { x => x.Model, _userForm },
+            { x => x.IsCreate, isCreate }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<UserFormDialog>(
+            isCreate ? "Create User" : "Edit User",
+            parameters,
+            options);
+
+        var result = await dialog.Result;
+
+        if (result is null ||
+            result.Canceled ||
+            result.Data is not UserFormModel submittedModel)
+        {
+            _isEditMode = false;
+            _editingUserId = null;
+            return;
+        }
+
+        _userForm = submittedModel;
         _isStatusChangeMode = false;
+
+        await ShowConfirmationDialogAsync();
     }
 
     private async Task ShowConfirmationDialogAsync()
     {
+        _userOperationSucceeded = false;
+
         var parameters = new DialogParameters<ConfirmationDialog>
         {
             { x => x.Message, ConfirmationMessage },
@@ -334,7 +357,8 @@
         {
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            CloseOnEscapeKey = true
+            CloseOnEscapeKey = true,
+            BackdropClick = false
         };
 
         var dialogReference =
@@ -343,22 +367,33 @@
                 parameters,
                 options);
 
-        await dialogReference.Result;
+        var result = await dialogReference.Result;
 
-        // Clean up status-change state if the dialog was
-        // cancelled or the status operation failed.
         if (_isStatusChangeMode)
         {
             CancelConfirmation();
+            return;
         }
-    }
 
-    private async Task RequestUserConfirmation(UserFormModel model)
-    {
-        _userForm = model;
-        _isStatusChangeMode = false; 
+        if (result is not null &&
+            !result.Canceled &&
+            _userOperationSucceeded)
+        {
+            // Operation succeeded. Clear the form state.
+            _userForm = new UserFormModel
+            {
+                IsCreate = true
+            };
 
-        await ShowConfirmationDialogAsync();
+            _isEditMode = false;
+            _editingUserId = null;
+
+            return;
+        }
+
+        // Confirmation was cancelled or the API operation failed.
+        // Reopen the form with its previous values.
+        await ShowUserFormDialogAsync();
     }
 
     private async Task RequestStatusConfirmation(
@@ -370,8 +405,6 @@
         _statusTargetUserId = user.UserId;
         _statusTargetName = user.FullName;
         _requestedActiveStatus = activate;
-
-        _showUserForm = false;
 
         _isEditMode = false;
         _editingUserId = null;
@@ -473,21 +506,13 @@
 
             if (response.StatusCode == HttpStatusCode.Created)
             {
-                var createdRole = _userForm.Role;
-
-                _showUserForm = false;
-
-                _userForm = new UserFormModel
-                {
-                    IsCreate = true
-                };
+                _userOperationSucceeded = true;
 
                 Snackbar.Add(
-                $"{createdRole} account created successfully.",
-                Severity.Success);
+                    $"{_userForm.Role} account created successfully.",
+                    Severity.Success);
 
                 await LoadUsersAsync();
-
                 return;
             }
 
@@ -603,22 +628,13 @@
 
             if (response.StatusCode == HttpStatusCode.NoContent)
             {
-                _showUserForm = false;
-
-                _isEditMode = false;
-                _editingUserId = null;
-
-                _userForm = new UserFormModel
-                {
-                    IsCreate = true
-                };
+                _userOperationSucceeded = true;
 
                 Snackbar.Add(
-                "User account updated successfully.",
-                Severity.Success);
+                    "User account updated successfully.",
+                    Severity.Success);
 
                 await LoadUsersAsync();
-
                 return;
             }
 
@@ -746,10 +762,10 @@
                 _statusTargetName = string.Empty;
 
                 Snackbar.Add(
-            requestedStatus
-                ? "User account activated successfully."
-                : "User account deactivated successfully.",
-            Severity.Success);
+                    requestedStatus
+                        ? "User account activated successfully."
+                        : "User account deactivated successfully.",
+                    Severity.Success);
 
                 await LoadUsersAsync();
                 return;

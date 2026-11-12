@@ -210,6 +210,143 @@ public sealed class ComplaintServiceTests
         Assert.IsTrue(history.ChangedAt > previousUpdatedAt);
     }
 
+    [TestMethod]
+    public async Task UpdateTechnicianComplaintStatusAsync_UpdatesStatusAndCreatesHistory()
+    {
+        var complaint = CreateSubmittedComplaint();
+        complaint.AssignToTechnician(20);
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint
+        };
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.UpdateTechnicianComplaintStatusAsync(
+            101,
+            20,
+            ComplaintStatus.InDiagnosis);
+
+        Assert.AreEqual(TechnicianStatusUpdateResult.Updated, result);
+        Assert.AreEqual(ComplaintStatus.InDiagnosis, complaint.Status);
+
+        Assert.AreEqual(1, repository.SaveStatusChangeCallCount);
+
+        Assert.IsNotNull(repository.SavedStatusHistory);
+        Assert.AreEqual(
+            ComplaintStatus.Assigned,
+            repository.SavedStatusHistory.PreviousStatus);
+        Assert.AreEqual(
+            ComplaintStatus.InDiagnosis,
+            repository.SavedStatusHistory.NewStatus);
+        Assert.AreEqual(
+            20,
+            repository.SavedStatusHistory.ChangedByUserId);
+        Assert.AreEqual(
+            complaint.UpdatedAt,
+            repository.SavedStatusHistory.ChangedAt);
+    }
+
+    [TestMethod]
+    public async Task UpdateTechnicianComplaintStatusAsync_ReturnsNotFound_WhenComplaintDoesNotExist()
+    {
+        var repository = new FakeComplaintRepository();
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.UpdateTechnicianComplaintStatusAsync(
+            101, 20, ComplaintStatus.InDiagnosis);
+
+        Assert.AreEqual(
+            TechnicianStatusUpdateResult.ComplaintNotFound,
+            result);
+
+        Assert.AreEqual(0, repository.SaveStatusChangeCallCount);
+    }
+
+    [TestMethod]
+    public async Task UpdateTechnicianComplaintStatusAsync_RejectsComplaintOwnedByAnotherTechnician()
+    {
+        var complaint = CreateSubmittedComplaint();
+        complaint.AssignToTechnician(30);
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint
+        };
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.UpdateTechnicianComplaintStatusAsync(
+            101, 20, ComplaintStatus.InDiagnosis);
+
+        Assert.AreEqual(
+            TechnicianStatusUpdateResult.ComplaintNotAssignedToTechnician,
+            result);
+
+        Assert.AreEqual(ComplaintStatus.Assigned, complaint.Status);
+        Assert.AreEqual(0, repository.SaveStatusChangeCallCount);
+    }
+
+    [TestMethod]
+    public async Task UpdateTechnicianComplaintStatusAsync_DoesNotAllowTechnicianToSetQuotePendingWithoutQuote()
+    {
+        var complaint = CreateSubmittedComplaint();
+        complaint.AssignToTechnician(20);
+        complaint.ChangeStatus(ComplaintStatus.InDiagnosis);
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint
+        };
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.UpdateTechnicianComplaintStatusAsync(
+            101, 20, ComplaintStatus.QuotePending);
+
+        Assert.AreEqual(
+            TechnicianStatusUpdateResult.InvalidTransition,
+            result);
+
+        Assert.AreEqual(ComplaintStatus.InDiagnosis, complaint.Status);
+        Assert.AreEqual(0, repository.SaveStatusChangeCallCount);
+    }
+
+    [TestMethod]
+    public async Task UpdateTechnicianComplaintStatusAsync_RejectsUndefinedStatus()
+    {
+        var complaint = CreateSubmittedComplaint();
+        complaint.AssignToTechnician(20);
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint
+        };
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.UpdateTechnicianComplaintStatusAsync(
+            101, 20, (ComplaintStatus)999);
+
+        Assert.AreEqual(
+            TechnicianStatusUpdateResult.InvalidStatus,
+            result);
+
+        Assert.AreEqual(0, repository.SaveStatusChangeCallCount);
+    }
+
     private static Complaint CreateSubmittedComplaint()
     {
         return new Complaint
@@ -244,6 +381,12 @@ public sealed class ComplaintServiceTests
         public ComplaintStatusHistory? SavedHistory { get; private set; }
 
         public int SaveAssignmentCallCount { get; private set; }
+
+        public Complaint? SavedStatusComplaint { get; private set; }
+
+        public ComplaintStatusHistory? SavedStatusHistory { get; private set; }
+
+        public int SaveStatusChangeCallCount { get; private set; }
 
         public Task<IReadOnlyList<Complaint>> GetByCustomerIdAsync(
             int customerId)
@@ -286,6 +429,17 @@ public sealed class ComplaintServiceTests
             SaveAssignmentCallCount++;
             SavedComplaint = complaint;
             SavedHistory = history;
+
+            return Task.CompletedTask;
+        }
+
+        public Task SaveStatusChangeAsync(
+            Complaint complaint,
+            ComplaintStatusHistory history)
+        {
+            SaveStatusChangeCallCount++;
+            SavedStatusComplaint = complaint;
+            SavedStatusHistory = history;
 
             return Task.CompletedTask;
         }

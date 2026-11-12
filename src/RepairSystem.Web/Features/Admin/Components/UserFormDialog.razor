@@ -1,0 +1,34 @@
+﻿@using RepairSystem.Web.Features.Admin.Contracts
+
+<MudDialog>
+
+    <DialogContent>
+        <UserForm Model="@Model"
+                  IsCreate="@IsCreate"
+                  IsSubmitting="false"
+                  OnValidSubmit="HandleValidSubmit"
+                  OnCancel="Cancel" />
+    </DialogContent>
+
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public UserFormModel Model { get; set; } = new();
+
+    [Parameter]
+    public bool IsCreate { get; set; }
+
+    private void HandleValidSubmit(UserFormModel model)
+    {
+        MudDialog.Close(DialogResult.Ok(model));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

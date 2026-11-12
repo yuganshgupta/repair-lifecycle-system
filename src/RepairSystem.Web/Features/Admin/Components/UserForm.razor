@@ -2,123 +2,100 @@
 @using RepairSystem.Web.Features.Admin.Contracts
 @using System.Collections.Generic
 
-<section class="card mb-4">
+<EditForm Model="@Model"
+          OnValidSubmit="HandleValidSubmit">
 
-    <div class="card-header bg-white py-3">
-        <h2 class="h5 mb-0">
-            @(IsCreate ? "Create User" : "Edit User")
-        </h2>
-    </div>
+    <DataAnnotationsValidator />
+    <ValidationSummary />
 
-    <div class="card-body">
+    <MudGrid Spacing="3">
 
-        <EditForm Model="@Model"
-                  OnValidSubmit="HandleValidSubmit">
+        <MudItem xs="12">
+            <MudTextField T="string"
+                          Label="Full Name"
+                          @bind-Value="Model.FullName"
+                          For="@(() => Model.FullName)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          UserAttributes="@FullNameAttributes" />
+        </MudItem>
 
-            <DataAnnotationsValidator />
-            <ValidationSummary />
+        <MudItem xs="12">
+            <MudTextField T="string"
+                          Label="Email Address"
+                          @bind-Value="Model.Email"
+                          For="@(() => Model.Email)"
+                          InputType="InputType.Email"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          UserAttributes="@EmailAttributes" />
+        </MudItem>
 
-            <div class="row g-3">
+        @if (IsCreate)
+        {
+            <MudItem xs="12">
+                <MudTextField T="string"
+                              Label="Temporary Password"
+                              @bind-Value="Model.Password"
+                              For="@(() => Model.Password)"
+                              InputType="InputType.Password"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              FullWidth="true"
+                              UserAttributes="@PasswordAttributes" />
+            </MudItem>
+        }
 
-                <div class="col-md-6">
-                    <MudTextField T="string"
-                                  Label="Full Name"
-                                  @bind-Value="Model.FullName"
-                                  For="@(() => Model.FullName)"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  FullWidth="true"
-                                  UserAttributes="@FullNameAttributes" />
-                </div>
+        <MudItem xs="12">
+            <MudSelect T="string"
+                       Label="Role"
+                       @bind-Value="Model.Role"
+                       For="@(() => Model.Role)"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true">
 
-                <div class="col-md-6">
-                    <MudTextField T="string"
-                                  Label="Email Address"
-                                  @bind-Value="Model.Email"
-                                  For="@(() => Model.Email)"
-                                  InputType="InputType.Email"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  FullWidth="true"
-                                  UserAttributes="@EmailAttributes" />
-                </div>
+                <MudSelectItem T="string" Value="@("Customer")">
+                    Customer
+                </MudSelectItem>
 
-                @if (IsCreate)
-                {
-                    <div class="col-md-6">
-                        <MudTextField T="string"
-                                      Label="Temporary Password"
-                                      @bind-Value="Model.Password"
-                                      For="@(() => Model.Password)"
-                                      InputType="InputType.Password"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      FullWidth="true"
-                                      UserAttributes="@PasswordAttributes" />
-                    </div>
-                }
+                <MudSelectItem T="string" Value="@("Technician")">
+                    Technician
+                </MudSelectItem>
 
-                <div class="col-md-6">
-                    <MudSelect T="string"
-                               Label="Role"
-                               @bind-Value="Model.Role"
-                               For="@(() => Model.Role)"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               FullWidth="true">
+                <MudSelectItem T="string" Value="@("Admin")">
+                    Admin
+                </MudSelectItem>
 
-                        <MudSelectItem T="string" Value="@("Customer")">
-                            Customer
-                        </MudSelectItem>
+            </MudSelect>
+        </MudItem>
 
-                        <MudSelectItem T="string" Value="@("Technician")">
-                            Technician
-                        </MudSelectItem>
+    </MudGrid>
 
-                        <MudSelectItem T="string" Value="@("Admin")">
-                            Admin
-                        </MudSelectItem>
+    <div class="d-flex justify-content-end gap-2 mt-4">
 
-                    </MudSelect>
-                </div>
+        <MudButton ButtonType="ButtonType.Button"
+                   Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Disabled="@IsSubmitting"
+                   OnClick="@OnCancel">
+            Cancel
+        </MudButton>
 
-            </div>
+        <MudButton ButtonType="ButtonType.Submit"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@IsSubmitting">
 
-            <div class="mt-4 d-flex gap-2">
+            @SubmitButtonText
 
-                <MudButton ButtonType="ButtonType.Submit"
-                           Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Disabled="@IsSubmitting">
-
-                    @if (IsSubmitting)
-                    {
-                        <MudProgressCircular Indeterminate="true"
-                                             Size="Size.Small"
-                                             Class="me-2" />
-                        <span>Saving...</span>
-                    }
-                    else
-                    {
-                        @SubmitButtonText
-                    }
-
-                </MudButton>
-
-                <MudButton ButtonType="ButtonType.Button"
-                           Variant="Variant.Outlined"
-                           Color="Color.Default"
-                           Disabled="@IsSubmitting"
-                           OnClick="@OnCancel">
-                    Cancel
-                </MudButton>
-
-            </div>
-
-        </EditForm>
+        </MudButton>
 
     </div>
-</section>
+
+</EditForm>
 
 @code {
     [Parameter, EditorRequired]
@@ -137,7 +114,7 @@
     public EventCallback OnCancel { get; set; }
 
     private string SubmitButtonText =>
-        IsCreate ? "Create User" : "Save Changes";
+        IsCreate ? "Continue" : "Review Changes";
 
     private static readonly Dictionary<string, object> FullNameAttributes =
         new()

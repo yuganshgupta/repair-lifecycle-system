@@ -21,4 +21,9 @@ public interface IComplaintService
 
     Task<IReadOnlyList<AdminUnassignedComplaintDto>>
     GetUnassignedComplaintsAsync();
+
+    Task<TechnicianStatusUpdateResult> UpdateTechnicianComplaintStatusAsync(
+    int complaintId,
+    int technicianId,
+    RepairSystem.Domain.Enums.ComplaintStatus newStatus);
 }

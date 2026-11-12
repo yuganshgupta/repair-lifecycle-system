@@ -1,5 +1,4 @@
-﻿
-@page "/admin/system-logs"
+﻿@page "/admin/system-logs"
 @attribute [Authorize(Roles = "Admin")]
 @rendermode InteractiveServer
 
@@ -8,12 +7,14 @@
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
 @using System.Text.Json
+@using RepairSystem.Web.Features.Admin.Components
 @using RepairSystem.Web.Features.Admin.Contracts
 @using RepairSystem.Web.Services.Authentication
 
 @inject IHttpClientFactory HttpClientFactory
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IApiTokenSessionStore TokenStore
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <MudProviders />
@@ -351,7 +352,8 @@
                     <MudButton Variant="Variant.Text"
                                Color="Color.Primary"
                                Size="Size.Small"
-                               OnClick="@(() => SelectLog(log))">
+                               StartIcon="@Icons.Material.Filled.Visibility"
+                               OnClick="@(() => OpenLogDetailsAsync(log))">
                         Inspect
                     </MudButton>
                 </MudTd>
@@ -380,118 +382,6 @@
 
     </MudPaper>
 
-    @if (_selectedLog is not null)
-    {
-        <MudPaper Elevation="0"
-                  Outlined="true"
-                  Class="pa-4 mt-4">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <MudText Typo="Typo.h6">
-                        Log entry #@_selectedLog.Id
-                    </MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Detailed event information
-                    </MudText>
-                </div>
-
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Default"
-                           StartIcon="@Icons.Material.Filled.Close"
-                           OnClick="@(() => _selectedLog = null)">
-                    Close
-                </MudButton>
-            </div>
-
-            <MudGrid Spacing="2">
-
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Timestamp
-                    </MudText>
-                    <MudText Typo="Typo.body2">
-                        @(_selectedLog.TimeStamp?.ToLocalTime().ToString("F") ?? "—")
-                    </MudText>
-                </MudItem>
-
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Application
-                    </MudText>
-                    <MudText Typo="Typo.body2">
-                        @(_selectedLog.Application ?? "—")
-                    </MudText>
-                </MudItem>
-
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Actor
-                    </MudText>
-                    <MudText Typo="Typo.body2">
-                        @(_selectedLog.ActorUserId?.ToString() ?? "Anonymous / system")
-                        · @(_selectedLog.ActorRole ?? "—")
-                    </MudText>
-                </MudItem>
-
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Outcome
-                    </MudText>
-                    <MudText Typo="Typo.body2">
-                        @(_selectedLog.Outcome ?? "—")
-                    </MudText>
-                </MudItem>
-
-                <MudItem xs="12">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Message
-                    </MudText>
-                    <MudPaper Class="pa-3 mt-1" Outlined="true">
-                        <MudText Typo="Typo.body2" Style="overflow-wrap:anywhere;">
-                            @(_selectedLog.Message ?? "No message recorded.")
-                        </MudText>
-                    </MudPaper>
-                </MudItem>
-
-                <MudItem xs="12">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Correlation ID
-                    </MudText>
-                    <MudText Typo="Typo.body2" Style="overflow-wrap:anywhere;">
-                        @(_selectedLog.CorrelationId ?? "—")
-                    </MudText>
-                </MudItem>
-
-                @if (!string.IsNullOrWhiteSpace(_selectedLog.Exception))
-                {
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Error">
-                            Exception
-                        </MudText>
-                        <MudPaper Class="pa-3 mt-1" Outlined="true">
-                            <pre style="white-space:pre-wrap; overflow-wrap:anywhere; margin:0;">@_selectedLog.Exception</pre>
-                        </MudPaper>
-                    </MudItem>
-                }
-
-                @if (!string.IsNullOrWhiteSpace(_selectedLog.Properties))
-                {
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            Structured properties
-                        </MudText>
-                        <MudPaper Class="pa-3 mt-1" Outlined="true">
-                            <pre style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:350px; overflow:auto; margin:0;">@_selectedLog.Properties</pre>
-                        </MudPaper>
-                    </MudItem>
-                }
-
-            </MudGrid>
-
-        </MudPaper>
-    }
-
 </div>
 
 @code {
@@ -508,8 +398,6 @@
 
     private DateTime? _fromDate;
     private DateTime? _toDate;
-
-    private SystemLogApiDto? _selectedLog;
 
     private string? _pageError;
 
@@ -829,8 +717,6 @@
 
     private async Task ApplyFiltersAsync()
     {
-        _selectedLog = null;
-
         if (_table is not null)
         {
             await _table.ReloadServerData();
@@ -847,7 +733,6 @@
         _actorRole = null;
         _fromDate = null;
         _toDate = null;
-        _selectedLog = null;
 
         if (_table is not null)
         {
@@ -874,8 +759,24 @@
         }
     }
 
-    private void SelectLog(SystemLogApiDto log)
+    private async Task OpenLogDetailsAsync(SystemLogApiDto log)
     {
-        _selectedLog = log;
+        var parameters = new DialogParameters<SystemLogDetailsDialog>
+        {
+            { x => x.Log, log }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = true
+        };
+
+        await DialogService.ShowAsync<SystemLogDetailsDialog>(
+            $"Log Entry #{log.Id}",
+            parameters,
+            options);
     }
 }
