@@ -1,6 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using RepairSystem.Web.Features.Admin.Contracts
 @using System.Collections.Generic
+@inject ISnackbar Snackbar
 
 <EditForm Model="@Model"
           OnValidSubmit="HandleValidSubmit">
@@ -18,6 +19,7 @@
                           Variant="Variant.Outlined"
                           Margin="Margin.Dense"
                           FullWidth="true"
+                          Immediate="true"
                           UserAttributes="@FullNameAttributes" />
         </MudItem>
 
@@ -30,6 +32,7 @@
                           Variant="Variant.Outlined"
                           Margin="Margin.Dense"
                           FullWidth="true"
+                          Immediate="true"
                           UserAttributes="@EmailAttributes" />
         </MudItem>
 
@@ -87,7 +90,8 @@
         <MudButton ButtonType="ButtonType.Submit"
                    Variant="Variant.Filled"
                    Color="Color.Primary"
-                   Disabled="@IsSubmitting">
+                   Disabled="@IsSubmitting"
+                   Class="@SubmitButtonClass">
 
             @SubmitButtonText
 
@@ -113,8 +117,32 @@
     [Parameter]
     public EventCallback OnCancel { get; set; }
 
+    [Parameter]
+    public UserFormModel? OriginalModel { get; set; }
+
     private string SubmitButtonText =>
         IsCreate ? "Continue" : "Review Changes";
+
+    private bool HasChanges =>
+        IsCreate ||
+        OriginalModel is null ||
+        !string.Equals(
+            Model.FullName?.Trim(),
+            OriginalModel.FullName?.Trim(),
+            StringComparison.Ordinal) ||
+        !string.Equals(
+            Model.Email?.Trim(),
+            OriginalModel.Email?.Trim(),
+            StringComparison.OrdinalIgnoreCase) ||
+        !string.Equals(
+            Model.Role?.Trim(),
+            OriginalModel.Role?.Trim(),
+            StringComparison.Ordinal);
+
+    private string SubmitButtonClass =>
+        !IsCreate && !HasChanges
+            ? "rl-save-unchanged"
+            : string.Empty;
 
     private static readonly Dictionary<string, object> FullNameAttributes =
         new()
@@ -139,8 +167,14 @@
         Model.IsCreate = IsCreate;
     }
 
-    private Task HandleValidSubmit()
+    private async Task HandleValidSubmit()
     {
-        return OnValidSubmit.InvokeAsync(Model);
+        if (!IsCreate && !HasChanges)
+        {
+            Snackbar.Add("No changes to save.", Severity.Info);
+            return;
+        }
+
+        await OnValidSubmit.InvokeAsync(Model);
     }
 }

@@ -23,4 +23,11 @@ public interface IComplaintRepository
     Task SaveStatusChangeAsync(
     Complaint complaint,
     ComplaintStatusHistory history);
+
+    Task AddWithHistoryAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history);
+
+    Task<IReadOnlyList<ComplaintStatusHistory>>
+        GetStatusHistoryByComplaintIdAsync(int complaintId);
 }

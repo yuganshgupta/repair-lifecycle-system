@@ -4,6 +4,7 @@
 
     <DialogContent>
         <UserForm Model="@Model"
+                  OriginalModel="@OriginalModel"
                   IsCreate="@IsCreate"
                   IsSubmitting="false"
                   OnValidSubmit="HandleValidSubmit"
@@ -18,6 +19,9 @@
 
     [Parameter, EditorRequired]
     public UserFormModel Model { get; set; } = new();
+
+    [Parameter]
+    public UserFormModel? OriginalModel { get; set; }
 
     [Parameter]
     public bool IsCreate { get; set; }

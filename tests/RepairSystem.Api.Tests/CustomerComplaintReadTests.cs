@@ -176,4 +176,96 @@ public sealed class CustomerComplaintReadTests
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    [TestMethod]
+    public async Task GetComplaintHistory_Returns401_WhenTokenIsMissing()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync(
+            $"{Endpoint}/101/history");
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        Assert.AreEqual(
+            0,
+            factory.FakeComplaintService.HistoryCallCount);
+    }
+
+    [TestMethod]
+    public async Task GetComplaintHistory_Returns403_WhenCallerIsTechnician()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = factory.CreateClient();
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                CreateToken("Technician", "200"));
+
+        var response = await client.GetAsync(
+            $"{Endpoint}/101/history");
+
+        Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode);
+
+        Assert.AreEqual(
+            0,
+            factory.FakeComplaintService.HistoryCallCount);
+    }
+
+    [TestMethod]
+    public async Task GetComplaintHistory_Returns200_WhenCallerIsComplaintOwner()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = CreateCustomerClient(factory);
+
+        factory.FakeComplaintService.CustomerComplaintHistory =
+        [
+            new CustomerComplaintHistoryDto
+        {
+            HistoryId = 10,
+            PreviousStatus = null,
+            NewStatus = "Submitted",
+            ChangedByName = "Demo Customer",
+            ChangedByRole = "Customer",
+            ChangedAt = DateTime.UtcNow
+        }
+        ];
+
+        var response = await client.GetAsync(
+            $"{Endpoint}/101/history");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+        var history =
+            await response.Content.ReadFromJsonAsync<
+                List<CustomerComplaintHistoryDto>>();
+
+        Assert.IsNotNull(history);
+        Assert.HasCount(1, history);
+        Assert.AreEqual("Submitted", history[0].NewStatus);
+
+        Assert.AreEqual(
+            100,
+            factory.FakeComplaintService.LastHistoryCustomerId);
+
+        Assert.AreEqual(
+            101,
+            factory.FakeComplaintService.LastHistoryComplaintId);
+    }
+
+    [TestMethod]
+    public async Task GetComplaintHistory_Returns404_WhenComplaintIsNotOwnedByCustomer()
+    {
+        using var factory = new RepairApiFactory();
+        using var client = CreateCustomerClient(factory);
+
+        factory.FakeComplaintService.CustomerComplaintHistory = null;
+
+        var response = await client.GetAsync(
+            $"{Endpoint}/101/history");
+
+        Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

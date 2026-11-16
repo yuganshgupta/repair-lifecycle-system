@@ -5,6 +5,7 @@
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
 @using System.Text.Json
+@using System.Threading
 @using RepairSystem.Web.Features.Dashboard.Contracts
 @using Microsoft.AspNetCore.Components.Forms
 
@@ -268,6 +269,7 @@
                                                     <th>Issue</th>
                                                     <th>Submitted</th>
                                                     <th>Status</th>
+                                                    <th>History</th>
                                                 </tr>
                                             </thead>
 
@@ -275,7 +277,9 @@
                                                 @foreach (var complaint in _customerComplaints
                                                     .OrderByDescending(c => c.CreatedAt))
                                                 {
-                                                    <tr>
+                                                    var isExpanded = _selectedHistoryComplaintId == complaint.ComplaintId;
+
+                                                    <tr class="@(isExpanded ? "rl-history-row-active" : null)">
                                                         <td>
                                                             <strong>
                                                                 @complaint.TicketNumber
@@ -304,10 +308,97 @@
                                                                 @FormatStatus(complaint.Status)
                                                             </span>
                                                         </td>
+
+                                                        <td>
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-primary d-inline-flex align-items-center justify-content-center rl-history-toggle"
+                                                                    aria-expanded="@isExpanded"
+                                                                    aria-label="@(isExpanded ? "Hide complaint history" : "Show complaint history")"
+                                                                    title="@(isExpanded ? "Hide history" : "Show history")"
+                                                                    @onclick="() => ToggleComplaintHistoryAsync(complaint)">
+                                                                <span class="rl-chevron-icon @(isExpanded ? "is-expanded" : null)">
+                                                                    <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" />
+                                                                </span>
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 }
                                             </tbody>
                                         </table>
+                                    </div>
+
+                                    <div class="rl-history-drawer @(_selectedHistoryComplaintId.HasValue ? "is-open" : null)"
+                                         aria-hidden="@(!_selectedHistoryComplaintId.HasValue)">
+                                        <div class="rl-history-drawer-inner">
+                                            <div class="card-body border-top">
+
+                                                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                                    <div>
+                                                        <h4 class="h5 mb-1">Repair Timeline</h4>
+                                                        <p class="text-muted mb-0">
+                                                            Ticket: @_selectedHistoryTicketNumber
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                @if (_showComplaintHistorySpinner)
+                                                {
+                                                    <div class="d-flex align-items-center gap-2 text-muted py-3 rl-timeline-fade">
+                                                        <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+                                                        <span>Loading repair history...</span>
+                                                    </div>
+                                                }
+                                                else if (_isFetchingComplaintHistory)
+                                                {
+                                                    <div style="min-height: 48px;"></div>
+                                                }
+                                                else if (!string.IsNullOrWhiteSpace(_complaintHistoryError))
+                                                {
+                                                    <div class="alert alert-danger mb-0 rl-timeline-fade">
+                                                        @_complaintHistoryError
+                                                    </div>
+                                                }
+                                                else if (_selectedComplaintHistory.Count == 0)
+                                                {
+                                                    <p class="text-muted mb-0 rl-timeline-fade">
+                                                        No status history has been recorded for this complaint yet.
+                                                    </p>
+                                                }
+                                                else
+                                                {
+                                                    <div class="pt-2 rl-timeline-fade" @key="_selectedHistoryComplaintId">
+                                                        @foreach (var item in _selectedComplaintHistory
+                                                            .OrderBy(h => h.ChangedAt)
+                                                            .ThenBy(h => h.HistoryId))
+                                                        {
+                                                            <div class="d-flex gap-3 py-3 border-bottom">
+
+                                                                <div class="rounded-circle bg-primary flex-shrink-0"
+                                                                     style="width: 10px; height: 10px; margin-top: 7px;">
+                                                                </div>
+
+                                                                <div>
+                                                                    <div class="fw-semibold">
+                                                                        @GetHistoryTitle(item.NewStatus)
+                                                                    </div>
+
+                                                                    <div class="text-muted small">
+                                                                        @item.ChangedByName
+                                                                        (@item.ChangedByRole)
+                                                                    </div>
+
+                                                                    <div class="text-muted small">
+                                                                        @item.ChangedAt.ToLocalTime().ToString(
+                                                                            "dd MMM yyyy, hh:mm tt")
+                                                                    </div>
+                                                                </div>
+
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
                                 }
                             </div>
@@ -407,6 +498,24 @@
 
     private string? _complaintsError;
 
+    private int? _selectedHistoryComplaintId;
+
+    private string? _selectedHistoryTicketNumber;
+
+    private bool _isFetchingComplaintHistory;
+
+    private bool _showComplaintHistorySpinner;
+
+    private string? _complaintHistoryError;
+
+    private IReadOnlyList<CustomerComplaintHistoryApiDto>
+        _selectedComplaintHistory = [];
+
+    private readonly Dictionary<int, IReadOnlyList<CustomerComplaintHistoryApiDto>>
+        _complaintHistoryCache = new();
+
+    private int _complaintHistoryRequestVersion;
+
     protected override async Task OnInitializedAsync()
     {
         var authState =
@@ -489,6 +598,7 @@
             if (complaints is not null)
             {
                 _customerComplaints = complaints;
+                _complaintHistoryCache.Clear();
             }
         }
         catch (HttpRequestException)
@@ -505,6 +615,186 @@
         {
             _complaintsError =
                 "The API returned an invalid response.";
+        }
+    }
+
+    private async Task ToggleComplaintHistoryAsync(
+        CustomerComplaintApiDto complaint)
+    {
+        if (_selectedHistoryComplaintId == complaint.ComplaintId)
+        {
+            CloseComplaintHistory();
+            return;
+        }
+
+        await LoadComplaintHistoryAsync(complaint);
+    }
+
+    private async Task LoadComplaintHistoryAsync(
+        CustomerComplaintApiDto complaint)
+    {
+        var requestVersion = ++_complaintHistoryRequestVersion;
+
+        _selectedHistoryComplaintId = complaint.ComplaintId;
+        _selectedHistoryTicketNumber = complaint.TicketNumber;
+        _complaintHistoryError = null;
+
+        if (_complaintHistoryCache.TryGetValue(
+                complaint.ComplaintId,
+                out var cachedHistory))
+        {
+            _isFetchingComplaintHistory = false;
+            _showComplaintHistorySpinner = false;
+            _selectedComplaintHistory = cachedHistory;
+            return;
+        }
+
+        _isFetchingComplaintHistory = true;
+        _showComplaintHistorySpinner = false;
+        _selectedComplaintHistory = [];
+
+        using var spinnerDelayCts = new CancellationTokenSource();
+        _ = RevealHistorySpinnerAfterDelayAsync(
+            requestVersion,
+            spinnerDelayCts.Token);
+
+        try
+        {
+            var authState =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            if (requestVersion != _complaintHistoryRequestVersion)
+                return;
+
+            var sessionId = authState.User
+                .FindFirst(WebAuthenticationDefaults.SessionIdClaimType)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                !TokenStore.TryGet(sessionId, out var session) ||
+                session is null)
+            {
+                _complaintHistoryError =
+                    "Your session is unavailable. Please sign in again.";
+                return;
+            }
+
+            if (session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                _complaintHistoryError =
+                    "Your API token has expired. Please sign in again.";
+                return;
+            }
+
+            var client = HttpClientFactory.CreateClient("RepairApi");
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"api/Complaints/{complaint.ComplaintId}/history");
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    session.AccessToken);
+
+            using var response = await client.SendAsync(request);
+
+            if (requestVersion != _complaintHistoryRequestVersion)
+                return;
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _complaintHistoryError =
+                    "Your session has expired. Please sign in again.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _complaintHistoryError =
+                    "You are not authorized to view this history.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _complaintHistoryError =
+                    "This complaint could not be found.";
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _complaintHistoryError =
+                    $"Could not load history. HTTP {(int)response.StatusCode}.";
+                return;
+            }
+
+            var history =
+                await response.Content.ReadFromJsonAsync<
+                    List<CustomerComplaintHistoryApiDto>>() ?? [];
+
+            if (requestVersion != _complaintHistoryRequestVersion)
+                return;
+
+            _complaintHistoryCache[complaint.ComplaintId] = history;
+            _selectedComplaintHistory = history;
+        }
+        catch (HttpRequestException)
+        {
+            if (requestVersion == _complaintHistoryRequestVersion)
+            {
+                _complaintHistoryError =
+                    "Could not connect to the API.";
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            if (requestVersion == _complaintHistoryRequestVersion)
+            {
+                _complaintHistoryError =
+                    "The history request timed out.";
+            }
+        }
+        catch (JsonException)
+        {
+            if (requestVersion == _complaintHistoryRequestVersion)
+            {
+                _complaintHistoryError =
+                    "The API returned an invalid history response.";
+            }
+        }
+        finally
+        {
+            spinnerDelayCts.Cancel();
+
+            if (requestVersion == _complaintHistoryRequestVersion)
+            {
+                _isFetchingComplaintHistory = false;
+                _showComplaintHistorySpinner = false;
+            }
+        }
+    }
+
+    private async Task RevealHistorySpinnerAfterDelayAsync(
+        int requestVersion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(150, cancellationToken);
+
+            if (!cancellationToken.IsCancellationRequested &&
+                requestVersion == _complaintHistoryRequestVersion &&
+                _isFetchingComplaintHistory)
+            {
+                _showComplaintHistorySpinner = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Response arrived within 150ms; skip spinner entirely.
         }
     }
 
@@ -676,5 +966,29 @@
             "Cancelled" => "bg-danger",
             _ => "bg-secondary"
         };
+    }
+
+    private static string GetHistoryTitle(string status)
+    {
+        return status switch
+        {
+            "Submitted" => "Complaint submitted",
+            "Assigned" => "Technician assigned",
+            "InDiagnosis" => "Diagnosis started",
+            "QuotePending" => "Quotation submitted",
+            "Approved" => "Quotation approved",
+            "InRepair" => "Repair started",
+            "Completed" => "Repair completed",
+            "Cancelled" => "Complaint cancelled",
+            _ => $"Status changed to {status}"
+        };
+    }
+
+    private void CloseComplaintHistory()
+    {
+        _complaintHistoryRequestVersion++;
+        _selectedHistoryComplaintId = null;
+        _isFetchingComplaintHistory = false;
+        _showComplaintHistorySpinner = false;
     }
 }

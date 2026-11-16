@@ -26,4 +26,9 @@ public interface IComplaintService
     int complaintId,
     int technicianId,
     RepairSystem.Domain.Enums.ComplaintStatus newStatus);
+
+    Task<IReadOnlyList<CustomerComplaintHistoryDto>?>
+    GetCustomerComplaintHistoryAsync(
+        int customerId,
+        int complaintId);
 }

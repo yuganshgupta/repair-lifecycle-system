@@ -51,6 +51,16 @@ public sealed class FakeComplaintService : IComplaintService
     public IReadOnlyList<AdminUnassignedComplaintDto> UnassignedComplaints { get; set; }
         = Array.Empty<AdminUnassignedComplaintDto>();
 
+    public int HistoryCallCount { get; private set; }
+
+    public int? LastHistoryCustomerId { get; private set; }
+
+    public int? LastHistoryComplaintId { get; private set; }
+
+    public IReadOnlyList<CustomerComplaintHistoryDto>?
+        CustomerComplaintHistory
+    { get; set; }
+
     public CustomerComplaintDto CreatedComplaint { get; set; } = new()
     {
         ComplaintId = 101,
@@ -124,5 +134,18 @@ public sealed class FakeComplaintService : IComplaintService
         LastRequestedStatus = newStatus;
 
         return Task.FromResult(StatusUpdateResult);
+    }
+
+    public Task<IReadOnlyList<CustomerComplaintHistoryDto>?>
+    GetCustomerComplaintHistoryAsync(
+        int customerId,
+        int complaintId)
+    {
+        HistoryCallCount++;
+
+        LastHistoryCustomerId = customerId;
+        LastHistoryComplaintId = complaintId;
+
+        return Task.FromResult(CustomerComplaintHistory);
     }
 }

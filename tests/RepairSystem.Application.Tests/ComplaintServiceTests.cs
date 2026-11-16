@@ -347,6 +347,113 @@ public sealed class ComplaintServiceTests
         Assert.AreEqual(0, repository.SaveStatusChangeCallCount);
     }
 
+    [TestMethod]
+    public async Task CreateCustomerComplaintAsync_CreatesInitialSubmittedHistory()
+    {
+        var repository = new FakeComplaintRepository();
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.CreateCustomerComplaintAsync(
+            1,
+            new CreateComplaintRequestDto
+            {
+                DeviceType = "Laptop",
+                DeviceBrand = "Dell",
+                DeviceModel = "Inspiron 15",
+                IssueDescription = "Laptop is not charging."
+            });
+
+        Assert.AreEqual("Submitted", result.Status);
+
+        Assert.AreEqual(1, repository.AddWithHistoryCallCount);
+
+        Assert.IsNotNull(repository.AddedInitialHistory);
+
+        Assert.IsNull(repository.AddedInitialHistory.PreviousStatus);
+
+        Assert.AreEqual(
+            ComplaintStatus.Submitted,
+            repository.AddedInitialHistory.NewStatus);
+
+        Assert.AreEqual(
+            1,
+            repository.AddedInitialHistory.ChangedByUserId);
+    }
+
+    [TestMethod]
+    public async Task GetCustomerComplaintHistoryAsync_ReturnsHistoryForComplaintOwner()
+    {
+        var complaint = CreateSubmittedComplaint();
+
+        var changedAt = DateTime.UtcNow;
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint,
+            StatusHistoryToReturn =
+            [
+                new ComplaintStatusHistory
+                {
+                    ComplaintStatusHistoryId = 10,
+                    ComplaintId = 101,
+                    PreviousStatus = null,
+                    NewStatus = ComplaintStatus.Submitted,
+                    ChangedByUserId = 1,
+                    ChangedAt = changedAt,
+                    ChangedByUser = new User
+                    {
+                        UserId = 1,
+                        FullName = "Demo Customer",
+                        Role = UserRole.Customer
+                    }
+                }
+            ]
+        };
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.GetCustomerComplaintHistoryAsync(
+            customerId: 1,
+            complaintId: 101);
+
+        Assert.IsNotNull(result);
+        Assert.HasCount(1, result);
+
+        Assert.AreEqual("Submitted", result[0].NewStatus);
+        Assert.AreEqual("Demo Customer", result[0].ChangedByName);
+        Assert.AreEqual("Customer", result[0].ChangedByRole);
+        Assert.AreEqual(changedAt, result[0].ChangedAt);
+    }
+
+    [TestMethod]
+    public async Task GetCustomerComplaintHistoryAsync_ReturnsNull_WhenComplaintBelongsToAnotherCustomer()
+    {
+        var complaint = CreateSubmittedComplaint();
+        complaint.CustomerId = 2;
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint
+        };
+
+        var service = new ComplaintService(
+            repository,
+            new FakeUserRepository());
+
+        var result = await service.GetCustomerComplaintHistoryAsync(
+            customerId: 1,
+            complaintId: 101);
+
+        Assert.IsNull(result);
+
+        Assert.AreEqual(0, repository.HistoryReadCallCount);
+    }
+
     private static Complaint CreateSubmittedComplaint()
     {
         return new Complaint
@@ -388,6 +495,17 @@ public sealed class ComplaintServiceTests
 
         public int SaveStatusChangeCallCount { get; private set; }
 
+        public Complaint? AddedComplaint { get; private set; }
+
+        public ComplaintStatusHistory? AddedInitialHistory { get; private set; }
+
+        public int AddWithHistoryCallCount { get; private set; }
+
+        public IReadOnlyList<ComplaintStatusHistory> StatusHistoryToReturn
+        { get; set; } = [];
+
+        public int HistoryReadCallCount { get; private set; }
+
         public Task<IReadOnlyList<Complaint>> GetByCustomerIdAsync(
             int customerId)
         {
@@ -397,6 +515,18 @@ public sealed class ComplaintServiceTests
 
         public Task AddAsync(Complaint complaint)
         {
+            return Task.CompletedTask;
+        }
+
+        public Task AddWithHistoryAsync(
+            Complaint complaint,
+            ComplaintStatusHistory history)
+        {
+            AddWithHistoryCallCount++;
+
+            AddedComplaint = complaint;
+            AddedInitialHistory = history;
+
             return Task.CompletedTask;
         }
 
@@ -420,6 +550,14 @@ public sealed class ComplaintServiceTests
                 : null;
 
             return Task.FromResult(complaint);
+        }
+
+        public Task<IReadOnlyList<ComplaintStatusHistory>>
+            GetStatusHistoryByComplaintIdAsync(int complaintId)
+        {
+            HistoryReadCallCount++;
+
+            return Task.FromResult(StatusHistoryToReturn);
         }
 
         public Task SaveAssignmentAsync(

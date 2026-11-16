@@ -83,4 +83,28 @@ public sealed class ComplaintRepository : IComplaintRepository
         // are persisted by this single SaveChanges call.
         await _context.SaveChangesAsync();
     }
+
+    public async Task AddWithHistoryAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history)
+    {
+        history.Complaint = complaint;
+
+        _context.Complaints.Add(complaint);
+        _context.ComplaintStatusHistories.Add(history);
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<IReadOnlyList<ComplaintStatusHistory>>
+        GetStatusHistoryByComplaintIdAsync(int complaintId)
+    {
+        return await _context.ComplaintStatusHistories
+            .AsNoTracking()
+            .Where(history => history.ComplaintId == complaintId)
+            .Include(history => history.ChangedByUser)
+            .OrderBy(history => history.ChangedAt)
+            .ThenBy(history => history.ComplaintStatusHistoryId)
+            .ToListAsync();
+    }
 }

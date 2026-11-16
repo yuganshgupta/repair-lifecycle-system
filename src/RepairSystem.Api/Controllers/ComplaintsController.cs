@@ -62,4 +62,23 @@ public sealed class ComplaintsController : ControllerBase
         return int.TryParse(userIdValue, out customerId) &&
                customerId > 0;
     }
+
+    [HttpGet("{complaintId:int}/history")]
+    public async Task<
+    ActionResult<IReadOnlyList<CustomerComplaintHistoryDto>>>
+    GetComplaintHistory(int complaintId)
+    {
+        if (!TryGetCustomerId(out var customerId))
+            return Unauthorized();
+
+        var history =
+            await _complaintService.GetCustomerComplaintHistoryAsync(
+                customerId,
+                complaintId);
+
+        if (history is null)
+            return NotFound();
+
+        return Ok(history);
+    }
 }

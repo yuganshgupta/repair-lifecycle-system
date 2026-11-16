@@ -35,6 +35,7 @@ public sealed class ComplaintService : IComplaintService
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(customerId);
         ArgumentNullException.ThrowIfNull(request);
 
+
         var now = DateTime.UtcNow;
         var ticketSuffix = Guid.NewGuid()
             .ToString("N")[..8]
@@ -65,7 +66,18 @@ public sealed class ComplaintService : IComplaintService
             UpdatedAt = now
         };
 
-        await _complaintRepository.AddAsync(complaint);
+        var initialHistory = new ComplaintStatusHistory
+        {
+            Complaint = complaint,
+            PreviousStatus = null,
+            NewStatus = ComplaintStatus.Submitted,
+            ChangedByUserId = customerId,
+            ChangedAt = now
+        };
+
+        await _complaintRepository.AddWithHistoryAsync(
+            complaint,
+            initialHistory);
 
         return MapToDto(complaint);
     }
@@ -292,6 +304,42 @@ public sealed class ComplaintService : IComplaintService
             history);
 
         return TechnicianStatusUpdateResult.Updated;
+    }
+
+    public async Task<IReadOnlyList<CustomerComplaintHistoryDto>?>
+    GetCustomerComplaintHistoryAsync(
+        int customerId,
+        int complaintId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(customerId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(complaintId);
+
+        // First verify that the complaint belongs to this Customer.
+        var complaint = await _complaintRepository.GetByIdAsync(
+            complaintId);
+
+        if (complaint is null || complaint.CustomerId != customerId)
+            return null;
+
+        // Retrieve history only after ownership is established.
+        var history =
+            await _complaintRepository.GetStatusHistoryByComplaintIdAsync(
+                complaintId);
+
+        return history.Select(item => new CustomerComplaintHistoryDto
+        {
+            HistoryId = item.ComplaintStatusHistoryId,
+
+            PreviousStatus = item.PreviousStatus?.ToString(),
+
+            NewStatus = item.NewStatus.ToString(),
+
+            ChangedByName = item.ChangedByUser.FullName,
+
+            ChangedByRole = item.ChangedByUser.Role.ToString(),
+
+            ChangedAt = item.ChangedAt
+        }).ToList();
     }
 
 }

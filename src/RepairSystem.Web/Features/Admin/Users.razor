@@ -214,6 +214,8 @@
         IsCreate = true
     };
 
+    private UserFormModel? _originalUserForm;
+
     private bool _isEditMode;
 
     private int? _editingUserId;
@@ -270,6 +272,7 @@
         _isEditMode = false;
         _editingUserId = null;
         _isStatusChangeMode = false;
+        _originalUserForm = null;
 
         _userForm = new UserFormModel
         {
@@ -285,6 +288,15 @@
         _isEditMode = true;
         _editingUserId = user.UserId;
         _isStatusChangeMode = false;
+
+        _originalUserForm = new UserFormModel
+        {
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+            Password = null,
+            IsCreate = false
+        };
 
         _userForm = new UserFormModel
         {
@@ -305,7 +317,8 @@
         var parameters = new DialogParameters<UserFormDialog>
         {
             { x => x.Model, _userForm },
-            { x => x.IsCreate, isCreate }
+            { x => x.IsCreate, isCreate },
+            { x => x.OriginalModel, _originalUserForm }
         };
 
         var options = new DialogOptions
@@ -340,6 +353,8 @@
 
     private async Task ShowConfirmationDialogAsync()
     {
+        var isStatusChangeConfirmation = _isStatusChangeMode;
+
         _userOperationSucceeded = false;
 
         var parameters = new DialogParameters<ConfirmationDialog>
@@ -369,7 +384,7 @@
 
         var result = await dialogReference.Result;
 
-        if (_isStatusChangeMode)
+        if (isStatusChangeConfirmation)
         {
             CancelConfirmation();
             return;
@@ -385,6 +400,7 @@
                 IsCreate = true
             };
 
+            _originalUserForm = null;
             _isEditMode = false;
             _editingUserId = null;
 
