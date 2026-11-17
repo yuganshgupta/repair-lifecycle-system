@@ -1,10 +1,42 @@
-/* =====================================================
-   REPAIR LIFECYCLE SYSTEM
-   GLOBAL DESIGN FOUNDATION
-===================================================== */
+/* ==========================================================================
+   REPAIR LIFECYCLE SYSTEM — GLOBAL STYLESHEET (app.css)
+   ==========================================================================
+   TABLE OF CONTENTS
+   1. Design Tokens & Bootstrap Variable Overrides (:root)
+   2. Base Document & Typography Defaults
+   3. Global Bootstrap Component Overrides (Buttons, Forms, Cards, Tables)
+   4. Shared Brand Mark (.rl-brand / .home-brand)
+   5. Landing Page (.home-*)
+      5.1 Navigation
+      5.2 Hero Section
+      5.3 Repair Journey Visual Card
+      5.4 Shared Section Headings
+      5.5 Feature Cards
+      5.6 Workflow Steps
+      5.7 Call to Action (CTA) & Footer
+      5.8 Landing Page Responsive Breakpoints
+   6. Authentication Pages (.auth-*)
+   7. Dashboard (.rl-dashboard-*)
+      7.1 Page Layout, Header & Sign-Out Actions
+      7.2 Sections & Content Cards
+      7.3 Summary Metric Cards
+      7.4 Action Buttons (Bootstrap & MudBlazor)
+      7.5 Repair Requests Table & Status Badges
+      7.6 Expandable Complaint History Drawer & Animations
+      7.7 Empty & Loading States
+      7.8 Dashboard Responsive Breakpoints
+   8. Admin & Shared Form Utilities (.rl-save-unchanged)
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. DESIGN TOKENS & BOOTSTRAP VARIABLE OVERRIDES
+   Central palette, surface colors, typography, and radii.
+   Change values here to update the theme across the entire app.
+   ========================================================================== */
 
 :root {
-    /* Brand */
+    /* Brand colors */
     --rl-primary: #2563EB;
     --rl-primary-hover: #1D4ED8;
     --rl-primary-soft: #EAF3FF;
@@ -12,21 +44,21 @@
     --rl-page-bg: #F5F8FC;
     --rl-surface: #FFFFFF;
     --rl-surface-secondary: #F8FAFC;
-    /* Text */
+    /* Text hierarchy */
     --rl-text: #172B4D;
     --rl-text-muted: #64748B;
-    /* Borders */
+    /* Borders & dividers */
     --rl-border: #DCE5F0;
-    /* Feedback */
+    /* Semantic feedback colors */
     --rl-success: #15803D;
     --rl-warning: #B45309;
     --rl-danger: #B91C1C;
-    /* Shape and spacing */
+    /* Border radii */
     --rl-radius: 6px;
     --rl-radius-small: 4px;
     /* Typography */
     --rl-font-family: "Roboto", Arial, sans-serif;
-    /* Bootstrap integration */
+    /* Map custom tokens into Bootstrap 5 CSS variables */
     --bs-primary: var(--rl-primary);
     --bs-primary-rgb: 37, 99, 235;
     --bs-body-font-family: var(--rl-font-family);
@@ -38,7 +70,10 @@
     --bs-secondary-color: var(--rl-text-muted);
 }
 
-/* Global document defaults */
+
+/* ==========================================================================
+   2. BASE DOCUMENT & TYPOGRAPHY DEFAULTS
+   ========================================================================== */
 
 *,
 *::before,
@@ -54,13 +89,11 @@ body {
 
 body {
     font-family: var(--rl-font-family);
-    font-size: 0.9375rem;
+    font-size: 0.9375rem; /* 15px base */
     line-height: 1.5;
     color: var(--rl-text);
     background-color: var(--rl-page-bg);
 }
-
-/* Consistent text rendering */
 
 h1,
 h2,
@@ -73,8 +106,6 @@ h6 {
     letter-spacing: normal;
 }
 
-/* Links */
-
 a {
     color: var(--rl-primary);
     text-decoration: none;
@@ -84,16 +115,20 @@ a {
         color: var(--rl-primary-hover);
     }
 
-/* Bootstrap buttons */
 
+/* ==========================================================================
+   3. GLOBAL BOOTSTRAP COMPONENT OVERRIDES
+   Aligns standard Bootstrap controls with the flat, bordered design system.
+   ========================================================================== */
+
+/* Buttons */
 .btn {
     border-radius: var(--rl-radius);
     font-family: var(--rl-font-family);
     font-weight: 500;
 }
 
-/* Form controls */
-
+/* Form inputs & selects */
 .form-control,
 .form-select {
     border-color: var(--rl-border);
@@ -108,8 +143,7 @@ a {
         box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.12);
     }
 
-/* Standard content cards */
-
+/* Cards */
 .card {
     background-color: var(--rl-surface);
     border-color: var(--rl-border);
@@ -122,23 +156,22 @@ a {
     border-bottom-color: var(--rl-border);
 }
 
-/* Bootstrap tables */
-
+/* Tables */
 .table {
     --bs-table-color: var(--rl-text);
     --bs-table-border-color: var(--rl-border);
 }
 
 /* Alerts */
-
 .alert {
     border-radius: var(--rl-radius);
 }
 
 
-/* =====================================================
-   SHARED BRAND MARK
-===================================================== */
+/* ==========================================================================
+   4. SHARED BRAND MARK
+   Used in both the public navbar (.home-brand) and auth/app headers (.rl-brand).
+   ========================================================================== */
 
 .rl-brand,
 .home-brand {
@@ -188,9 +221,10 @@ a {
     }
 
 
-/* =========================================
-   LANDING PAGE
-========================================= */
+/* ==========================================================================
+   5. LANDING PAGE (.home-*)
+   Public marketing/overview page styles.
+   ========================================================================== */
 
 .home-page {
     --home-navy: var(--rl-text);
@@ -210,7 +244,7 @@ a {
         text-decoration: none;
     }
 
-/* Navigation */
+/* --- 5.1 Navigation --- */
 
 .home-navbar {
     position: sticky;
@@ -267,7 +301,7 @@ a {
         box-shadow: none;
     }
 
-/* Hero */
+/* --- 5.2 Hero Section --- */
 
 .home-hero {
     padding: 64px 0;
@@ -393,7 +427,7 @@ a {
         font-weight: 700;
     }
 
-/* Repair journey preview */
+/* --- 5.3 Repair Journey Visual Card --- */
 
 .home-visual {
     padding: 8px;
@@ -521,7 +555,7 @@ a {
     display: none;
 }
 
-/* Shared section headings */
+/* --- 5.4 Shared Section Headings --- */
 
 .home-section-heading {
     margin-bottom: 32px;
@@ -557,7 +591,7 @@ a {
     line-height: 1.6;
 }
 
-/* Features */
+/* --- 5.5 Feature Cards --- */
 
 .home-features {
     padding: 56px 0;
@@ -624,7 +658,7 @@ a {
     font-weight: 600;
 }
 
-/* Workflow */
+/* --- 5.6 Workflow Steps --- */
 
 .home-workflow {
     padding: 56px 0;
@@ -677,7 +711,7 @@ a {
     line-height: 1.6;
 }
 
-/* Call to action */
+/* --- 5.7 Call to Action (CTA) & Footer --- */
 
 .home-cta {
     padding: 44px 0;
@@ -724,8 +758,6 @@ a {
         color: #ffffff !important;
     }
 
-/* Footer */
-
 .home-footer {
     padding: 22px 0;
     background: var(--rl-surface);
@@ -752,7 +784,7 @@ a {
     font-size: 12px;
 }
 
-/* Responsive */
+/* --- 5.8 Landing Page Responsive Breakpoints --- */
 
 @media (max-width: 991.98px) {
     .home-hero {
@@ -825,9 +857,10 @@ a {
 }
 
 
-/* =====================================================
-   AUTHENTICATION PAGES
-===================================================== */
+/* ==========================================================================
+   6. AUTHENTICATION PAGES (.auth-*)
+   Login and registration card layout.
+   ========================================================================== */
 
 .auth-page {
     min-height: 100vh;
@@ -932,9 +965,12 @@ a {
 }
 
 
-/* =====================================================
-   DASHBOARD
-===================================================== */
+/* ==========================================================================
+   7. DASHBOARD (.rl-dashboard-*)
+   Shared styles for Customer, Technician, and Admin views on /dashboard.
+   ========================================================================== */
+
+/* --- 7.1 Page Layout, Header & Sign-Out Actions --- */
 
 .rl-dashboard {
     padding: 32px 0 48px;
@@ -942,8 +978,6 @@ a {
     font-family: var(--rl-font-family);
     color: var(--rl-text);
 }
-
-/* Dashboard Page Header */
 
 .rl-dashboard-header {
     margin-bottom: 28px;
@@ -986,7 +1020,38 @@ a {
     letter-spacing: 0.4px;
 }
 
-/* Dashboard Sections */
+/* Header right-side container (role badge + inline sign-out form) */
+.rl-dashboard-header-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+    .rl-dashboard-header-actions form {
+        margin: 0;
+    }
+
+.rl-dashboard-signout {
+    min-height: 38px;
+    padding: 8px 14px;
+    font-size: 14px;
+}
+
+/* Bottom sign-out footer (fallback when sign-out is placed at page bottom) */
+.rl-dashboard-footer {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rl-border);
+}
+
+    .rl-dashboard-footer .btn {
+        min-height: 38px;
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+
+/* --- 7.2 Sections & Content Cards --- */
 
 .rl-dashboard-section {
     margin-bottom: 24px;
@@ -1013,8 +1078,6 @@ a {
         color: var(--rl-text-muted);
         font-size: 14px;
     }
-
-/* Dashboard Cards (Customer, Technician, Admin) */
 
 .rl-dashboard-card {
     background-color: var(--rl-surface);
@@ -1048,6 +1111,7 @@ a {
     line-height: 1.6;
 }
 
+/* Form controls inside dashboard cards (e.g. New Repair Request form) */
 .rl-dashboard-card .form-label {
     color: var(--rl-text);
     font-size: 13px;
@@ -1069,7 +1133,7 @@ a {
     font-size: 14px;
 }
 
-/* Summary Metric Cards */
+/* --- 7.3 Summary Metric Cards --- */
 
 .rl-dashboard-stat-card .rl-dashboard-card-body {
     padding: 20px 24px;
@@ -1090,7 +1154,7 @@ a {
     line-height: 1.2;
 }
 
-/* Dashboard Actions (Bootstrap & MudBlazor buttons) */
+/* --- 7.4 Action Buttons (Bootstrap & MudBlazor) --- */
 
 .rl-dashboard-actions {
     display: flex;
@@ -1116,7 +1180,7 @@ a {
             box-shadow: none;
         }
 
-/* Dashboard Table */
+/* --- 7.5 Repair Requests Table & Status Badges --- */
 
 .rl-dashboard-table {
     margin-bottom: 0;
@@ -1141,9 +1205,18 @@ a {
         vertical-align: middle;
     }
 
-    .rl-dashboard-table tbody tr:last-child td {
-        border-bottom: none;
+    .rl-dashboard-table tbody tr {
+        transition: background-color 0.2s ease;
     }
+
+        .rl-dashboard-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Highlights the ticket row whose history drawer is currently open */
+        .rl-dashboard-table tbody tr.rl-history-row-active {
+            background-color: var(--rl-primary-soft);
+        }
 
 .rl-dashboard-device-name {
     font-weight: 500;
@@ -1157,7 +1230,73 @@ a {
     font-weight: 500;
 }
 
-/* Empty & Loading States */
+/* --- 7.6 Expandable Complaint History Drawer & Animations --- */
+
+/* Removes Bootstrap cell padding/borders from the hidden detail row when collapsed */
+.rl-dashboard-table .rl-history-detail-row > td {
+    padding: 0 !important;
+    border-top: 0;
+    border-bottom: 0;
+}
+
+/* History chevron toggle button inside each ticket row */
+.rl-history-toggle {
+    min-width: 32px;
+    min-height: 28px;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+/* Rotates the down-chevron 180deg smoothly when expanded */
+.rl-chevron-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+    .rl-chevron-icon.is-expanded {
+        transform: rotate(180deg);
+    }
+
+/* CSS Grid 0fr -> 1fr trick: animates height smoothly without fixed pixel values */
+.rl-history-drawer {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease, visibility 0.28s ease;
+}
+
+    .rl-history-drawer.is-open {
+        grid-template-rows: 1fr;
+        opacity: 1;
+        visibility: visible;
+    }
+
+/* min-height: 0 + overflow: hidden allows the grid child to collapse to 0px */
+.rl-history-drawer-inner {
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Subtle fade-and-slide entrance for timeline items */
+.rl-timeline-fade {
+    animation: rlTimelineFadeIn 0.22s ease-out;
+}
+
+@keyframes rlTimelineFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- 7.7 Empty & Loading States --- */
 
 .rl-dashboard-empty {
     padding: 40px 24px;
@@ -1177,21 +1316,7 @@ a {
         font-size: 14px;
     }
 
-/* Dashboard Footer / Sign-out */
-
-.rl-dashboard-footer {
-    margin-top: 28px;
-    padding-top: 20px;
-    border-top: 1px solid var(--rl-border);
-}
-
-    .rl-dashboard-footer .btn {
-        min-height: 38px;
-        padding: 8px 16px;
-        font-size: 14px;
-    }
-
-/* Dashboard Responsive Rules */
+/* --- 7.8 Dashboard Responsive Breakpoints --- */
 
 @media (max-width: 575.98px) {
     .rl-dashboard {
@@ -1204,10 +1329,15 @@ a {
         align-items: flex-start;
     }
 
-        .rl-dashboard-section-header .rl-dashboard-actions,
-        .rl-dashboard-section-header .rl-dashboard-actions .btn {
-            width: 100%;
-        }
+    .rl-dashboard-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .rl-dashboard-section-header .rl-dashboard-actions,
+    .rl-dashboard-section-header .rl-dashboard-actions .btn {
+        width: 100%;
+    }
 
     .rl-dashboard-card-header,
     .rl-dashboard-card-body,
@@ -1221,68 +1351,43 @@ a {
     }
 }
 
-/* Complaint history smooth expand/collapse */
-.rl-dashboard-table tbody tr {
-    transition: background-color 0.2s ease;
-}
 
-    .rl-dashboard-table tbody tr.rl-history-row-active {
-        background-color: var(--rl-primary-soft);
-    }
+/* ==========================================================================
+   8. ADMIN & SHARED FORM UTILITIES
+   ========================================================================== */
 
-.rl-history-toggle {
-    min-width: 32px;
-    min-height: 28px;
-    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-
-.rl-chevron-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-    .rl-chevron-icon.is-expanded {
-        transform: rotate(180deg);
-    }
-
-.rl-history-drawer {
-    display: grid;
-    grid-template-rows: 0fr;
-    opacity: 0;
-    visibility: hidden;
-    transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease, visibility 0.28s ease;
-}
-
-    .rl-history-drawer.is-open {
-        grid-template-rows: 1fr;
-        opacity: 1;
-        visibility: visible;
-    }
-
-.rl-history-drawer-inner {
-    overflow: hidden;
-}
-
-.rl-timeline-fade {
-    animation: rlTimelineFadeIn 0.22s ease-out;
-}
-
-@keyframes rlTimelineFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-4px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
+/* Visually dims the Edit User "Review Changes" button when no fields have changed,
+   while keeping it clickable so submitting triggers the "No changes to save." snackbar. */
 .rl-save-unchanged {
     opacity: 0.55;
     filter: grayscale(1);
     cursor: pointer;
 }
+
+.rl-session-expired {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 55vh;
+    padding: 24px;
+}
+
+.rl-session-expired-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 32px;
+    background: var(--rl-surface);
+    border: 1px solid var(--rl-border);
+    border-radius: var(--rl-radius);
+    text-align: center;
+}
+
+    .rl-session-expired-card h2 {
+        font-size: 22px;
+        margin-bottom: 12px;
+    }
+
+    .rl-session-expired-card p {
+        color: var(--rl-text-muted);
+        margin-bottom: 22px;
+    }

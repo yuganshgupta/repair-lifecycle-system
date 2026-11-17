@@ -43,6 +43,10 @@ builder.Services.AddAntiforgery();
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
+builder.Services.AddScoped<
+    AuthenticationStateProvider,
+    SessionRevalidatingAuthenticationStateProvider>();
+
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<
     IApiTokenSessionStore,

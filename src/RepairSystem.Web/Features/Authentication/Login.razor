@@ -1,5 +1,9 @@
 ﻿@page "/login"
 @rendermode InteractiveServer
+@implements IDisposable
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
 
 <PageTitle>Sign In | Repair Lifecycle</PageTitle>
 
@@ -157,4 +161,51 @@
 
     [SupplyParameterFromQuery(Name = "loggedOut")]
     public string? LoggedOut { get; set; }
+
+    private bool _wasAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        _wasAuthenticated =
+            authenticationState.User.Identity?.IsAuthenticated == true;
+
+        AuthenticationStateProvider.AuthenticationStateChanged +=
+            HandleAuthenticationStateChanged;
+    }
+
+    private void HandleAuthenticationStateChanged(
+        Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            var authenticationState =
+                await authenticationStateTask;
+
+            var isAuthenticated =
+                authenticationState.User.Identity?.IsAuthenticated == true;
+
+            if (_wasAuthenticated && !isAuthenticated)
+            {
+                // The circuit's antiforgery token belongs to the old identity.
+                // Reload the page to obtain a fresh anonymous token.
+                Navigation.NavigateTo(
+                    "/login",
+                    forceLoad: true,
+                    replace: true);
+
+                return;
+            }
+
+            _wasAuthenticated = isAuthenticated;
+        });
+    }
+
+    public void Dispose()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged -=
+            HandleAuthenticationStateChanged;
+    }
 }
