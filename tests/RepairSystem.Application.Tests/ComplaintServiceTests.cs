@@ -208,6 +208,27 @@ public sealed class ComplaintServiceTests
         Assert.AreEqual(ComplaintStatus.Assigned, history.NewStatus);
         Assert.AreEqual(5, history.ChangedByUserId);
         Assert.IsTrue(history.ChangedAt > previousUpdatedAt);
+
+        Assert.IsNotNull(
+            complaintRepository.SavedAssignmentActivity);
+
+        var activity = complaintRepository.SavedAssignmentActivity;
+
+        Assert.AreEqual(
+            BusinessActivityType.TechnicianAssigned,
+            activity.EventType);
+
+        Assert.AreEqual(5, activity.ActorUserId);
+        Assert.AreEqual("Test Administrator", activity.ActorName);
+        Assert.AreEqual("Admin", activity.ActorRole);
+
+        Assert.AreEqual(20, activity.TargetUserId);
+        Assert.AreEqual("Test Technician", activity.TargetUserName);
+
+        Assert.AreEqual(1, activity.CustomerId);
+        Assert.AreEqual("Demo Customer", activity.CustomerName);
+
+        Assert.AreEqual(101, activity.ComplaintId);
     }
 
     [TestMethod]
@@ -221,9 +242,20 @@ public sealed class ComplaintServiceTests
             ComplaintToReturn = complaint
         };
 
+        var userRepository = new FakeUserRepository
+        {
+            UserToReturn = new User
+            {
+                UserId = 20,
+                FullName = "Test Technician",
+                Role = UserRole.Technician,
+                IsActive = true
+            }
+        };
+
         var service = new ComplaintService(
             repository,
-            new FakeUserRepository());
+            userRepository);
 
         var result = await service.UpdateTechnicianComplaintStatusAsync(
             101,
@@ -248,7 +280,99 @@ public sealed class ComplaintServiceTests
         Assert.AreEqual(
             complaint.UpdatedAt,
             repository.SavedStatusHistory.ChangedAt);
+
+        Assert.IsNotNull(repository.SavedStatusActivity);
+
+        var activity = repository.SavedStatusActivity;
+
+        Assert.AreEqual(
+            BusinessActivityType.DiagnosisStarted,
+            activity.EventType);
+
+        Assert.AreEqual(20, activity.ActorUserId);
+        Assert.AreEqual("Test Technician", activity.ActorName);
+        Assert.AreEqual("Technician", activity.ActorRole);
+        Assert.AreEqual(101, activity.ComplaintId);
+        Assert.AreEqual(1, activity.CustomerId);
     }
+
+
+    [TestMethod]
+    [DataRow(
+        ComplaintStatus.Approved,
+        ComplaintStatus.InRepair,
+        BusinessActivityType.RepairStarted)]
+    [DataRow(
+        ComplaintStatus.InRepair,
+        ComplaintStatus.Completed,
+        BusinessActivityType.RepairCompleted)]
+    public async Task UpdateTechnicianComplaintStatusAsync_RecordsRepairActivity(
+        ComplaintStatus initialStatus,
+        ComplaintStatus newStatus,
+        BusinessActivityType expectedEventType)
+    {
+        // Arrange: an existing complaint assigned to technician 20.
+        var complaint = CreateSubmittedComplaint();
+        complaint.AssignedTechnicianId = 20;
+        complaint.Status = initialStatus;
+
+        var repository = new FakeComplaintRepository
+        {
+            ComplaintToReturn = complaint
+        };
+
+        var userRepository = new FakeUserRepository
+        {
+            UserToReturn = new User
+            {
+                UserId = 20,
+                FullName = "Test Technician",
+                Role = UserRole.Technician,
+                IsActive = true
+            }
+        };
+
+        var service = new ComplaintService(
+            repository,
+            userRepository);
+
+        // Act: the technician advances the repair.
+        var result = await service.UpdateTechnicianComplaintStatusAsync(
+            101,
+            20,
+            newStatus);
+
+        // Assert: status, history and activity are recorded.
+        Assert.AreEqual(
+            TechnicianStatusUpdateResult.Updated,
+            result);
+
+        Assert.AreEqual(newStatus, complaint.Status);
+
+        Assert.AreEqual(
+            1,
+            repository.SaveStatusChangeCallCount);
+
+        Assert.IsNotNull(repository.SavedStatusHistory);
+
+        Assert.AreEqual(
+            initialStatus,
+            repository.SavedStatusHistory.PreviousStatus);
+
+        Assert.AreEqual(
+            newStatus,
+            repository.SavedStatusHistory.NewStatus);
+
+        var activity = repository.SavedStatusActivity;
+        Assert.IsNotNull(activity);
+
+        Assert.AreEqual(expectedEventType, activity.EventType);
+        Assert.AreEqual(20, activity.ActorUserId);
+        Assert.AreEqual("Test Technician", activity.ActorName);
+        Assert.AreEqual(101, activity.ComplaintId);
+        Assert.AreEqual(1, activity.CustomerId);
+    }
+
 
     [TestMethod]
     public async Task UpdateTechnicianComplaintStatusAsync_ReturnsNotFound_WhenComplaintDoesNotExist()
@@ -352,9 +476,20 @@ public sealed class ComplaintServiceTests
     {
         var repository = new FakeComplaintRepository();
 
+        var userRepository = new FakeUserRepository
+        {
+            UserToReturn = new User
+            {
+                UserId = 1,
+                FullName = "Demo Customer",
+                Role = UserRole.Customer,
+                IsActive = true
+            }
+        };
+
         var service = new ComplaintService(
             repository,
-            new FakeUserRepository());
+            userRepository);
 
         var result = await service.CreateCustomerComplaintAsync(
             1,
@@ -381,6 +516,28 @@ public sealed class ComplaintServiceTests
         Assert.AreEqual(
             1,
             repository.AddedInitialHistory.ChangedByUserId);
+
+        // Verify that a business activity was recorded.
+        Assert.HasCount(
+            1,
+            repository.RecordedBusinessActivities);
+
+        var activity = repository.RecordedBusinessActivities[0];
+
+        Assert.AreEqual(
+            BusinessActivityType.ComplaintSubmitted,
+            activity.EventType);
+
+        Assert.AreEqual(1, activity.ActorUserId);
+        Assert.AreEqual("Demo Customer", activity.ActorName);
+        Assert.AreEqual("Customer", activity.ActorRole);
+
+        Assert.AreEqual(1, activity.CustomerId);
+        Assert.AreEqual(101, activity.ComplaintId);
+
+        Assert.AreEqual(
+            result.TicketNumber,
+            activity.TicketNumber);
     }
 
     [TestMethod]
@@ -467,7 +624,7 @@ public sealed class ComplaintServiceTests
 
     private static FakeUserRepository CreateActiveTechnicianRepository()
     {
-        return new FakeUserRepository
+        var repository = new FakeUserRepository
         {
             UserToReturn = new User
             {
@@ -477,6 +634,24 @@ public sealed class ComplaintServiceTests
                 IsActive = true
             }
         };
+
+        repository.AdditionalUsers[5] = new User
+        {
+            UserId = 5,
+            FullName = "Test Administrator",
+            Role = UserRole.Admin,
+            IsActive = true
+        };
+
+        repository.AdditionalUsers[1] = new User
+        {
+            UserId = 1,
+            FullName = "Demo Customer",
+            Role = UserRole.Customer,
+            IsActive = true
+        };
+
+        return repository;
     }
 
     private sealed class FakeComplaintRepository : IComplaintRepository
@@ -493,6 +668,10 @@ public sealed class ComplaintServiceTests
 
         public ComplaintStatusHistory? SavedStatusHistory { get; private set; }
 
+        public BusinessActivityEvent? SavedStatusActivity { get; private set; }
+
+        public BusinessActivityEvent? SavedAssignmentActivity { get; private set; }
+
         public int SaveStatusChangeCallCount { get; private set; }
 
         public Complaint? AddedComplaint { get; private set; }
@@ -501,8 +680,9 @@ public sealed class ComplaintServiceTests
 
         public int AddWithHistoryCallCount { get; private set; }
 
-        public IReadOnlyList<ComplaintStatusHistory> StatusHistoryToReturn
-        { get; set; } = [];
+        public IReadOnlyList<ComplaintStatusHistory> StatusHistoryToReturn { get; set; } = [];
+
+        public List<BusinessActivityEvent> RecordedBusinessActivities { get; } = new();
 
         public int HistoryReadCallCount { get; private set; }
 
@@ -524,10 +704,36 @@ public sealed class ComplaintServiceTests
         {
             AddWithHistoryCallCount++;
 
+            // Simulate the identity ID generated by SQL Server.
+            if (complaint.ComplaintId == 0)
+            {
+                complaint.ComplaintId = 101;
+            }
+
+            // Simulate the saved history's foreign key.
+            history.ComplaintId = complaint.ComplaintId;
+
             AddedComplaint = complaint;
             AddedInitialHistory = history;
 
             return Task.CompletedTask;
+        }
+
+        public async Task AddWithHistoryAndActivityAsync(
+            Complaint complaint,
+            ComplaintStatusHistory history,
+            Func<Complaint, BusinessActivityEvent> createActivity)
+        {
+            ArgumentNullException.ThrowIfNull(createActivity);
+
+            // Reuse the existing fake complaint/history persistence.
+            await AddWithHistoryAsync(complaint, history);
+
+            // Create the event after the fake has saved the complaint.
+            var activity = createActivity(complaint);
+
+            // Store the event so tests can inspect it.
+            RecordedBusinessActivities.Add(activity);
         }
 
         public Task<IReadOnlyList<Complaint>> GetAssignedToTechnicianAsync(
@@ -562,22 +768,27 @@ public sealed class ComplaintServiceTests
 
         public Task SaveAssignmentAsync(
             Complaint complaint,
-            ComplaintStatusHistory history)
+            ComplaintStatusHistory history,
+            BusinessActivityEvent activity)
         {
             SaveAssignmentCallCount++;
+
             SavedComplaint = complaint;
             SavedHistory = history;
+            SavedAssignmentActivity = activity;
 
             return Task.CompletedTask;
         }
 
         public Task SaveStatusChangeAsync(
             Complaint complaint,
-            ComplaintStatusHistory history)
+            ComplaintStatusHistory history,
+            BusinessActivityEvent activity)
         {
             SaveStatusChangeCallCount++;
             SavedStatusComplaint = complaint;
             SavedStatusHistory = history;
+            SavedStatusActivity = activity;
 
             return Task.CompletedTask;
         }
@@ -586,6 +797,8 @@ public sealed class ComplaintServiceTests
     private sealed class FakeUserRepository : IUserRepository
     {
         public User? UserToReturn { get; set; }
+
+        public Dictionary<int, User> AdditionalUsers { get; } = new();
 
         public Task<bool> EmailExistsAsync(string email)
         {
@@ -610,11 +823,16 @@ public sealed class ComplaintServiceTests
 
         public Task<User?> GetByIdAsync(int userId)
         {
-            var user = UserToReturn?.UserId == userId
+            if (AdditionalUsers.TryGetValue(userId, out var user))
+            {
+                return Task.FromResult<User?>(user);
+            }
+
+            var result = UserToReturn?.UserId == userId
                 ? UserToReturn
                 : null;
 
-            return Task.FromResult(user);
+            return Task.FromResult(result);
         }
 
         public Task UpdateAsync(User user)

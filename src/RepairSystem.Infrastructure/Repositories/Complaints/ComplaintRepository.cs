@@ -53,10 +53,20 @@ public sealed class ComplaintRepository : IComplaintRepository
 
     public async Task SaveAssignmentAsync(
     Complaint complaint,
-    ComplaintStatusHistory history)
+    ComplaintStatusHistory history,
+    BusinessActivityEvent activity)
     {
+        ArgumentNullException.ThrowIfNull(complaint);
+        ArgumentNullException.ThrowIfNull(history);
+        ArgumentNullException.ThrowIfNull(activity);
+
+        // The complaint is already tracked by EF Core.
         _context.ComplaintStatusHistories.Add(history);
 
+        // Register the new business activity event.
+        _context.BusinessActivityEvents.Add(activity);
+
+        // Persist all three changes together.
         await _context.SaveChangesAsync();
     }
 
@@ -74,13 +84,18 @@ public sealed class ComplaintRepository : IComplaintRepository
 
     public async Task SaveStatusChangeAsync(
     Complaint complaint,
-    ComplaintStatusHistory history)
+    ComplaintStatusHistory history,
+    BusinessActivityEvent activity)
     {
-        _context.ComplaintStatusHistories.Add(history);
+        ArgumentNullException.ThrowIfNull(complaint);
+        ArgumentNullException.ThrowIfNull(history);
+        ArgumentNullException.ThrowIfNull(activity);
 
-        // The complaint was loaded as a tracked entity.
-        // Both its status update and the history record
-        // are persisted by this single SaveChanges call.
+        _context.ComplaintStatusHistories.Add(history);
+        _context.BusinessActivityEvents.Add(activity);
+
+        // The complaint is already tracked.
+        // Save all three changes in one transaction.
         await _context.SaveChangesAsync();
     }
 
@@ -94,6 +109,38 @@ public sealed class ComplaintRepository : IComplaintRepository
         _context.ComplaintStatusHistories.Add(history);
 
         await _context.SaveChangesAsync();
+    }
+
+    public async Task AddWithHistoryAndActivityAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history,
+    Func<Complaint, BusinessActivityEvent> createActivity)
+    {
+        ArgumentNullException.ThrowIfNull(complaint);
+        ArgumentNullException.ThrowIfNull(history);
+        ArgumentNullException.ThrowIfNull(createActivity);
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        history.Complaint = complaint;
+
+        _context.Complaints.Add(complaint);
+        _context.ComplaintStatusHistories.Add(history);
+
+        // First save generates the ComplaintId.
+        await _context.SaveChangesAsync();
+
+        // Now create an activity containing the generated ID.
+        var activity = createActivity(complaint);
+
+        _context.BusinessActivityEvents.Add(activity);
+
+        // Save the activity within the same transaction.
+        await _context.SaveChangesAsync();
+
+        // Commit only after every database write succeeds.
+        await transaction.CommitAsync();
     }
 
     public async Task<IReadOnlyList<ComplaintStatusHistory>>

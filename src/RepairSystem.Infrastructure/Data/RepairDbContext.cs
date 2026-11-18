@@ -23,6 +23,9 @@ public class RepairDbContext : DbContext
 
     public DbSet<SystemLogEntry> SystemLogs => Set<SystemLogEntry>();
 
+    public DbSet<BusinessActivityEvent> BusinessActivityEvents
+    => Set<BusinessActivityEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -153,6 +156,78 @@ public class RepairDbContext : DbContext
 
             entity.Property(log => log.Application)
                 .HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<BusinessActivityEvent>(entity =>
+        {
+            entity.ToTable("BusinessActivityEvents", "dbo");
+
+            entity.HasKey(activity => activity.BusinessActivityEventId);
+
+            entity.Property(activity => activity.BusinessActivityEventId)
+                .ValueGeneratedOnAdd();
+
+            entity.Property(activity => activity.EventType)
+                .HasConversion<int>()
+                .IsRequired();
+
+            entity.Property(activity => activity.OccurredAtUtc)
+                .HasColumnType("datetime2")
+                .IsRequired();
+
+            entity.Property(activity => activity.ActorUserId);
+
+            entity.Property(activity => activity.ActorName)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(activity => activity.ActorRole)
+                .HasMaxLength(32)
+                .IsRequired();
+
+            entity.Property(activity => activity.TargetUserId);
+
+            entity.Property(activity => activity.TargetUserName)
+                .HasMaxLength(120);
+
+            entity.Property(activity => activity.CustomerId);
+
+            entity.Property(activity => activity.CustomerName)
+                .HasMaxLength(120);
+
+            entity.Property(activity => activity.ComplaintId);
+
+            entity.Property(activity => activity.TicketNumber)
+                .HasMaxLength(64);
+
+            entity.Property(activity => activity.Title)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(activity => activity.Description)
+                .HasMaxLength(1000)
+                .IsRequired();
+
+            entity.Property(activity => activity.DetailsJson)
+                .HasColumnType("nvarchar(max)");
+
+            // Global activity feed: newest events first.
+            entity.HasIndex(activity => activity.OccurredAtUtc);
+
+            // Complaint and customer activity timelines.
+            entity.HasIndex(activity =>
+                new { activity.ComplaintId, activity.OccurredAtUtc });
+
+            entity.HasIndex(activity =>
+                new { activity.CustomerId, activity.OccurredAtUtc });
+
+            // Filter activity by the user who performed it.
+            entity.HasIndex(activity =>
+                new { activity.ActorUserId, activity.OccurredAtUtc });
+
+            // Filter activity by event category.
+            entity.HasIndex(activity =>
+                new { activity.EventType, activity.OccurredAtUtc });
         });
     }
 }

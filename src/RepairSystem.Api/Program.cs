@@ -23,6 +23,9 @@ using Serilog.Sinks.MSSqlServer;
 using RepairSystem.Application.Interfaces.SystemLogs;
 using RepairSystem.Application.Services.SystemLogs;
 using RepairSystem.Infrastructure.Repositories.SystemLogs;
+using RepairSystem.Application.Interfaces.BusinessActivity;
+using RepairSystem.Application.Services.BusinessActivity;
+using RepairSystem.Infrastructure.Repositories.BusinessActivity;
 
 
 // start the API and load its configuration
@@ -251,6 +254,14 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     ISystemLogService,
     SystemLogService>();
+
+builder.Services.AddScoped<
+    IBusinessActivityRepository,
+    BusinessActivityRepository>();
+
+builder.Services.AddScoped<
+    IBusinessActivityService,
+    BusinessActivityService>();
 
 builder.Services.AddSingleton<
     IAccessTokenGenerator,

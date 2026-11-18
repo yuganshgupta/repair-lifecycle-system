@@ -35,6 +35,10 @@ public sealed class ComplaintService : IComplaintService
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(customerId);
         ArgumentNullException.ThrowIfNull(request);
 
+        var customer = await _userRepository.GetByIdAsync(customerId)
+    ?? throw new InvalidOperationException(
+        "The customer account was not found.");
+
 
         var now = DateTime.UtcNow;
         var ticketSuffix = Guid.NewGuid()
@@ -75,9 +79,23 @@ public sealed class ComplaintService : IComplaintService
             ChangedAt = now
         };
 
-        await _complaintRepository.AddWithHistoryAsync(
-            complaint,
-            initialHistory);
+        await _complaintRepository.AddWithHistoryAndActivityAsync(
+    complaint,
+    initialHistory,
+    savedComplaint => BusinessActivityEvent.Create(
+        eventType: BusinessActivityType.ComplaintSubmitted,
+        actorName: customer.FullName,
+        actorRole: customer.Role.ToString(),
+        title: "Complaint submitted",
+        description:
+            $"Customer submitted complaint {savedComplaint.TicketNumber}.",
+        actorUserId: customerId,
+        customerId: customerId,
+        customerName: customer.FullName,
+        complaintId: savedComplaint.ComplaintId,
+        ticketNumber: savedComplaint.TicketNumber
+    )
+);
 
         return MapToDto(complaint);
     }
@@ -180,6 +198,18 @@ public sealed class ComplaintService : IComplaintService
             return ComplaintAssignmentResult.InvalidComplaintStatus;
         }
 
+        // Retrieve the administrator performing the assignment.
+        var admin = await _userRepository.GetByIdAsync(
+            assignedByAdminId)
+            ?? throw new InvalidOperationException(
+                "The administrator account was not found.");
+
+        // Retrieve the customer who owns the complaint.
+        var customer = await _userRepository.GetByIdAsync(
+            complaint.CustomerId)
+            ?? throw new InvalidOperationException(
+                "The complaint customer account was not found.");
+
         var previousStatus = complaint.Status;
         var changedAt = DateTime.UtcNow;
 
@@ -196,10 +226,30 @@ public sealed class ComplaintService : IComplaintService
             ChangedAt = changedAt
         };
 
-        // 9. Persist the assignment and history together.
+        // Create an activity describing the successful assignment.
+        var activity = BusinessActivityEvent.Create(
+            eventType: BusinessActivityType.TechnicianAssigned,
+            actorName: admin.FullName,
+            actorRole: admin.Role.ToString(),
+            title: "Technician assigned",
+            description:
+                $"Administrator {admin.FullName} assigned " +
+                $"{technician.FullName} to complaint " +
+                $"{complaint.TicketNumber}.",
+            actorUserId: assignedByAdminId,
+            targetUserId: technicianId,
+            targetUserName: technician.FullName,
+            customerId: complaint.CustomerId,
+            customerName: customer.FullName,
+            complaintId: complaint.ComplaintId,
+            ticketNumber: complaint.TicketNumber
+        );
+
+        // Save the assignment, status history and business event.
         await _complaintRepository.SaveAssignmentAsync(
             complaint,
-            history);
+            history,
+            activity);
 
         return ComplaintAssignmentResult.Assigned;
     }
@@ -299,9 +349,47 @@ public sealed class ComplaintService : IComplaintService
             ChangedAt = complaint.UpdatedAt
         };
 
+        var technician = await _userRepository.GetByIdAsync(
+    technicianId)
+    ?? throw new InvalidOperationException(
+        "The technician account was not found.");
+
+        var (eventType, title) = newStatus switch
+        {
+            ComplaintStatus.InDiagnosis => (
+                BusinessActivityType.DiagnosisStarted,
+                "Diagnosis started"),
+
+            ComplaintStatus.InRepair => (
+                BusinessActivityType.RepairStarted,
+                "Repair started"),
+
+            ComplaintStatus.Completed => (
+                BusinessActivityType.RepairCompleted,
+                "Repair completed"),
+
+            _ => throw new InvalidOperationException(
+                "Unsupported technician activity.")
+        };
+
+        var activity = BusinessActivityEvent.Create(
+            eventType: eventType,
+            actorName: technician.FullName,
+            actorRole: technician.Role.ToString(),
+            title: title,
+            description:
+                $"Technician {technician.FullName} updated complaint " +
+                $"{complaint.TicketNumber} from {previousStatus} to {newStatus}.",
+            actorUserId: technicianId,
+            customerId: complaint.CustomerId,
+            complaintId: complaint.ComplaintId,
+            ticketNumber: complaint.TicketNumber
+        );
+
         await _complaintRepository.SaveStatusChangeAsync(
             complaint,
-            history);
+            history,
+            activity);
 
         return TechnicianStatusUpdateResult.Updated;
     }

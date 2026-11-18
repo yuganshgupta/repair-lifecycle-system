@@ -15,18 +15,25 @@ public interface IComplaintRepository
     Task<Complaint?> GetByIdAsync(int complaintId);
 
     Task SaveAssignmentAsync(
-        Complaint complaint,
-        ComplaintStatusHistory history);
+    Complaint complaint,
+    ComplaintStatusHistory history,
+    BusinessActivityEvent activity);
 
     Task<IReadOnlyList<Complaint>> GetUnassignedAsync();
 
     Task SaveStatusChangeAsync(
     Complaint complaint,
-    ComplaintStatusHistory history);
+    ComplaintStatusHistory history,
+    BusinessActivityEvent activity);
 
     Task AddWithHistoryAsync(
     Complaint complaint,
     ComplaintStatusHistory history);
+
+    Task AddWithHistoryAndActivityAsync(
+    Complaint complaint,
+    ComplaintStatusHistory history,
+    Func<Complaint, BusinessActivityEvent> createActivity);
 
     Task<IReadOnlyList<ComplaintStatusHistory>>
         GetStatusHistoryByComplaintIdAsync(int complaintId);
