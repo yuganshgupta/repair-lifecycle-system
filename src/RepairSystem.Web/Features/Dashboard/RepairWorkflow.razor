@@ -1,0 +1,736 @@
+﻿@page "/repair/{ComplaintId:int}"
+@attribute [Authorize(Roles = "Customer,Technician,Admin")]
+@rendermode InteractiveServer
+
+@using System.Net.Http.Headers
+@using System.Text.Json
+
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApiTokenSessionStore TokenStore
+
+<MudProviders />
+
+<PageTitle>Repair Details</PageTitle>
+
+<div class="container mt-4 mb-5">
+
+    <div class="d-flex justify-content-between
+        align-items-center mb-4">
+        <h1>Repair Details</h1>
+
+        <a class="btn btn-outline-primary"
+           href="@(_isTechnician
+               ? "/technician/complaints"
+               : "/dashboard")">
+            Back
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="alert alert-success">@_message</div>
+    }
+
+    @if (_busy)
+    {
+        <MudProgressLinear Indeterminate="true"
+                           Color="Color.Primary" />
+    }
+
+    @if (_view is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h4>@_view.TicketNumber</h4>
+
+                <span class="badge bg-primary">
+                    @_view.Status
+                </span>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h4>Photographic Evidence</h4>
+
+                @if (_view.Attachments.Count == 0)
+                {
+                    <p class="text-muted">
+                        No photographs uploaded.
+                    </p>
+                }
+
+                @foreach (var evidence in _view.Attachments)
+                {
+                    <div class="border rounded p-2 mb-2">
+                        <strong>@evidence.Purpose</strong>
+
+                        <div class="text-muted small">
+                            @evidence.UploadedAt.ToString("dd MMM yyyy")
+                        </div>
+
+                        <a href="@($"/repair-evidence/{ComplaintId}/{evidence.AttachmentId}")"
+                           target="_blank"
+                           rel="noopener noreferrer">
+                            View photograph
+                        </a>
+                    </div>
+                }
+
+                @if (CanUpload)
+                {
+                    <div class="mt-3">
+                        <label class="form-label">
+                            Evidence purpose
+                        </label>
+
+                        <select class="form-select mb-3"
+                                @bind="_purpose"
+                                disabled="@_busy">
+
+                            @if (_isCustomer)
+                            {
+                                <option value="0">
+                                    Customer issue proof
+                                </option>
+                            }
+
+                            @if (_isTechnician &&
+                                 _view.Status == "InDiagnosis")
+                            {
+                                <option value="1">
+                                    Warranty rejection proof
+                                </option>
+                            }
+
+                            @if (_isTechnician)
+                            {
+                                <option value="2">
+                                    Repair progress proof
+                                </option>
+                            }
+
+                        </select>
+
+                        <InputFile OnChange="UploadAsync"
+                                   accept="image/png,image/jpeg"
+                                   disabled="@_busy"
+                                   class="form-control" />
+
+                        <small class="text-muted">
+                            JPEG or PNG. Maximum 20 MB per file.
+                        </small>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (_view.Quote is not null)
+        {
+            var quote = _view.Quote;
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4>Repair Quotation</h4>
+
+                    <h6 class="mt-3">Diagnostic findings</h6>
+                    <p>@quote.DiagnosticFindings</p>
+
+                    <h6>Warranty determination</h6>
+
+                    <p>
+                        @(quote.IsWarrantyValid
+                            ? "Covered under warranty"
+                            : "Not covered under warranty")
+                    </p>
+
+                    @if (!quote.IsWarrantyValid)
+                    {
+                        <p>
+                            <strong>Reason:</strong>
+                            @quote.WarrantyRejectionReason
+                        </p>
+                    }
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Qty</th>
+                                    <th>Unit price</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var item in quote.Items)
+                                {
+                                    <tr>
+                                        <td>@item.ItemType</td>
+                                        <td>@item.Description</td>
+                                        <td>@item.Quantity</td>
+                                        <td>₹@item.UnitPrice.ToString("N2")</td>
+                                        <td>₹@item.TotalPrice.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5>
+                        Estimated repair cost:
+                        ₹@quote.EstimatedTotalCost.ToString("N2")
+                    </h5>
+
+                    @if (!quote.IsWarrantyValid)
+                    {
+                        <p class="text-muted">
+                            Inspection fee if repair is declined:
+                            ₹@quote.InspectionFee.ToString("N2")
+                        </p>
+                    }
+
+                    <p>
+                        <strong>Decision:</strong>
+                        @quote.CustomerDecision
+                    </p>
+
+                    @if (quote.InspectionFeeDue > 0)
+                    {
+                        <div class="alert alert-warning">
+                            Inspection fee payable:
+                            ₹@quote.InspectionFeeDue.ToString("N2")
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(quote.DecisionReason))
+                    {
+                        <p>
+                            <strong>Decision reason:</strong>
+                            @quote.DecisionReason
+                        </p>
+                    }
+
+                    @if (_isCustomer &&
+                         _view.Status == "QuotePending" &&
+                         quote.CustomerDecision == "Pending")
+                    {
+                        <hr />
+
+                        <label class="form-label">
+                            Decision reason (optional)
+                        </label>
+
+                        <textarea class="form-control mb-3"
+                                  maxlength="500"
+                                  @bind="_decisionReason">
+                        </textarea>
+
+                        <p class="text-muted small">
+                            Your decision is final for this quotation.
+                        </p>
+
+                        <button type="button"
+                                class="btn btn-success me-2"
+                                disabled="@_busy"
+                                @onclick="() => DecideAsync(true)">
+                            Accept quotation
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-outline-danger"
+                                disabled="@_busy"
+                                @onclick="() => DecideAsync(false)">
+                            Reject quotation
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+        else if (_isTechnician &&
+                 _view.Status == "InDiagnosis")
+        {
+            <div class="card">
+                <div class="card-body">
+                    <h4>Prepare Quotation</h4>
+
+                    <label class="form-label">
+                        Diagnostic findings
+                    </label>
+
+                    <textarea class="form-control mb-3"
+                              rows="4"
+                              maxlength="2000"
+                              @bind="_diagnosticFindings">
+                    </textarea>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox"
+                               class="form-check-input"
+                               id="warranty-valid"
+                               @bind="_isWarrantyValid" />
+
+                        <label class="form-check-label"
+                               for="warranty-valid">
+                            Repair is fully covered by warranty
+                        </label>
+                    </div>
+
+                    @if (!_isWarrantyValid)
+                    {
+                        <label class="form-label">
+                            Warranty rejection reason
+                        </label>
+
+                        <textarea class="form-control mb-3"
+                                  maxlength="500"
+                                  @bind="_warrantyReason">
+                        </textarea>
+
+                        <div class="alert alert-info">
+                            Upload warranty rejection evidence above.
+
+                            Inspection fee if declined:
+                            ₹@_view.ConfiguredInspectionFee.ToString("N2")
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            Fully covered warranty items must have
+                            a unit price of zero.
+                        </div>
+                    }
+
+                    <h5>Quotation Items</h5>
+
+                    @foreach (var item in _items)
+                    {
+                        <div class="row g-2 mb-3 border-bottom pb-3"
+                             @key="item">
+
+                            <div class="col-md-2">
+                                <label class="form-label">Type</label>
+
+                                <select class="form-select"
+                                        @bind="item.ItemType">
+                                    <option value="0">Part</option>
+                                    <option value="1">Labour</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Description
+                                </label>
+
+                                <input class="form-control"
+                                       maxlength="250"
+                                       @bind="item.Description" />
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="form-label">Quantity</label>
+
+                                <input class="form-control"
+                                       type="number"
+                                       min="1"
+                                       @bind="item.Quantity" />
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="form-label">
+                                    Unit price (₹)
+                                </label>
+
+                                <input class="form-control"
+                                       type="number"
+                                       min="0"
+                                       step="0.01"
+                                       @bind="item.UnitPrice" />
+                            </div>
+
+                            <div class="col-md-2 align-self-end">
+                                <button type="button"
+                                        class="btn btn-outline-danger"
+                                        disabled="@(_items.Count == 1)"
+                                        @onclick="() => RemoveItem(item)">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <button type="button"
+                            class="btn btn-outline-primary mb-3"
+                            disabled="@(_items.Count >= 100 || _busy)"
+                            @onclick="AddItem">
+                        + Add item
+                    </button>
+
+                    <h5>
+                        Estimated repair total:
+                        ₹@EstimatedTotal.ToString("N2")
+                    </h5>
+
+                    <p class="text-muted small">
+                        The API verifies all amounts and calculates
+                        the authoritative total.
+                    </p>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@_busy"
+                            @onclick="SubmitAsync">
+                        Submit quotation
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-secondary">
+                No quotation has been submitted yet.
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int ComplaintId { get; set; }
+
+    private WorkflowView? _view;
+
+    private bool _isTechnician;
+    private bool _isCustomer;
+    private bool _busy;
+
+    private string? _error;
+    private string? _message;
+
+    private string _diagnosticFindings = "";
+    private bool _isWarrantyValid;
+    private string _warrantyReason = "";
+    private string _decisionReason = "";
+
+    private int _purpose;
+
+    private const long MaxFileBytes =
+        20L * 1024 * 1024;
+
+    private readonly List<LineInput> _items =
+        new() { new LineInput() };
+
+    private decimal EstimatedTotal
+    {
+        get
+        {
+            try
+            {
+                return _items.Sum(x => x.Quantity * x.UnitPrice);
+            }
+            catch (OverflowException)
+            {
+                return 0m;
+            }
+        }
+    }
+
+    private bool CanUpload =>
+        _view is not null &&
+        (
+            (_isCustomer &&
+                _view.Status is
+                    "Submitted" or
+                    "Assigned" or
+                    "InDiagnosis")
+            ||
+            (_isTechnician &&
+                _view.Status is
+                    "InDiagnosis" or
+                    "Approved" or
+                    "InRepair" or
+                    "Completed")
+        );
+
+    private string ApiRoute =>
+        $"api/repair-workflow/{ComplaintId}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var auth = await AuthenticationStateProvider
+            .GetAuthenticationStateAsync();
+
+        _isTechnician = auth.User.IsInRole("Technician");
+        _isCustomer = auth.User.IsInRole("Customer");
+
+        _view = null;
+
+        await RunAsync(LoadAsync);
+    }
+
+    private void AddItem()
+    {
+        if (_items.Count < 100)
+        {
+            _items.Add(new LineInput());
+        }
+    }
+
+    private void RemoveItem(LineInput item)
+    {
+        if (_items.Count > 1)
+        {
+            _items.Remove(item);
+        }
+    }
+
+    private async Task LoadAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync(ApiRoute);
+
+        await EnsureSuccessAsync(response);
+
+        _view = await response.Content
+            .ReadFromJsonAsync<WorkflowView>();
+
+        if (_isCustomer)
+        {
+            _purpose = 0;
+        }
+        else if (_isTechnician)
+        {
+            _purpose = _view?.Status == "InDiagnosis" ? 1 : 2;
+        }
+    }
+
+    private Task SubmitAsync()
+    {
+        return RunAsync(async client =>
+        {
+            var request = new
+            {
+                DiagnosticFindings = _diagnosticFindings,
+                IsWarrantyValid = _isWarrantyValid,
+
+                WarrantyRejectionReason =
+                    _isWarrantyValid ? null : _warrantyReason,
+
+                Items = _items
+            };
+
+            using var response = await client.PostAsJsonAsync(
+                $"{ApiRoute}/quote", request);
+
+            await EnsureSuccessAsync(response);
+
+            _message = "Quotation submitted successfully.";
+
+            await LoadAsync(client);
+        });
+    }
+
+    private Task DecideAsync(bool accept)
+    {
+        return RunAsync(async client =>
+        {
+            using var response = await client.PostAsJsonAsync(
+                $"{ApiRoute}/decision",
+                new
+                {
+                    Accept = accept,
+                    Reason = _decisionReason
+                });
+
+            await EnsureSuccessAsync(response);
+
+            _message = accept
+                ? "Quotation accepted. Repair approved."
+                : "Quotation rejected. Complaint cancelled.";
+
+            await LoadAsync(client);
+        });
+    }
+
+    private Task UploadAsync(InputFileChangeEventArgs args)
+    {
+        return RunAsync(async client =>
+        {
+            var file = args.File;
+
+            if (file.Size <= 0 || file.Size > MaxFileBytes)
+            {
+                throw new InvalidOperationException(
+                    "Maximum allowed file size is 20 MB.");
+            }
+
+            await using var stream =
+                file.OpenReadStream(MaxFileBytes);
+
+            using var form = new MultipartFormDataContent();
+
+            using var content = new StreamContent(stream);
+
+            form.Add(content, "file", file.Name);
+
+            using var response = await client.PostAsync(
+                $"{ApiRoute}/attachments?purpose={_purpose}",
+                form);
+
+            await EnsureSuccessAsync(response);
+
+            _message = "Photograph uploaded successfully.";
+
+            await LoadAsync(client);
+        });
+    }
+
+    private async Task RunAsync(
+        Func<HttpClient, Task> operation)
+    {
+        if (_busy)
+            return;
+
+        _busy = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var auth = await AuthenticationStateProvider
+                .GetAuthenticationStateAsync();
+
+            var sessionId = auth.User
+                .FindFirst(
+                    WebAuthenticationDefaults.SessionIdClaimType)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                !TokenStore.TryGet(sessionId, out var session) ||
+                session is null ||
+                session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                _error = "Please sign out and sign in again.";
+                return;
+            }
+
+            using var client =
+                HttpClientFactory.CreateClient("RepairApi");
+
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer", session.AccessToken);
+
+            await operation(client);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not connect to the API.";
+        }
+        catch (TaskCanceledException)
+        {
+            _error = "The request timed out. Refresh and try again.";
+        }
+        catch (IOException)
+        {
+            _error = "The photograph could not be read.";
+        }
+        catch (JsonException)
+        {
+            _error = "The API returned an invalid response.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static async Task EnsureSuccessAsync(
+        HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var message =
+            $"Request failed ({(int)response.StatusCode}).";
+
+        try
+        {
+            using var json = JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync());
+
+            if (json.RootElement.ValueKind ==
+                    JsonValueKind.Object &&
+                json.RootElement.TryGetProperty(
+                    "message", out var value) &&
+                value.ValueKind == JsonValueKind.String)
+            {
+                message = value.GetString() ?? message;
+            }
+        }
+        catch (JsonException)
+        {
+            // Use the HTTP status message.
+        }
+
+        throw new InvalidOperationException(message);
+    }
+
+    public sealed class LineInput
+    {
+        public int ItemType { get; set; }
+
+        public string Description { get; set; } = "";
+
+        public int Quantity { get; set; } = 1;
+
+        public decimal UnitPrice { get; set; }
+    }
+
+    public sealed record WorkflowView(
+        int ComplaintId,
+        string TicketNumber,
+        string Status,
+        decimal ConfiguredInspectionFee,
+        QuoteView? Quote,
+        List<EvidenceView> Attachments);
+
+    public sealed record QuoteView(
+        int QuoteId,
+        string DiagnosticFindings,
+        bool IsWarrantyValid,
+        string? WarrantyRejectionReason,
+        decimal InspectionFee,
+        decimal InspectionFeeDue,
+        decimal EstimatedTotalCost,
+        string CustomerDecision,
+        string? DecisionReason,
+        DateTime? DecisionTimestamp,
+        List<QuoteLineView> Items);
+
+    public sealed record QuoteLineView(
+        string ItemType,
+        string Description,
+        int Quantity,
+        decimal UnitPrice,
+        decimal TotalPrice);
+
+    public sealed record EvidenceView(
+        int AttachmentId,
+        string Purpose,
+        long FileSizeBytes,
+        DateTime UploadedAt);
+}

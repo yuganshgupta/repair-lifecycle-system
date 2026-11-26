@@ -132,6 +132,12 @@
                                 align-items-center gap-2">
                                 <div class="d-flex align-items-center gap-2">
                                     <strong>@complaint.TicketNumber</strong>
+                                    <div class="mt-2">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           href="@($"/repair/{complaint.ComplaintId}")">
+                                            Repair Details
+                                        </a>
+                                    </div>
                                     <MudChip T="string"
                                              Size="Size.Small"
                                              Color="@GetStatusColor(complaint.Status)">
@@ -206,6 +212,18 @@
 
                                 @if (GetNextTechnicianStatus(complaint.Status) is int nextStatus)
                                 {
+                                    <div class="mt-3">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Primary"
+                                                   Href="@($"/repair/{complaint.ComplaintId}")">
+
+                                            @(complaint.Status == "InDiagnosis"
+                                                ? "Prepare Quotation"
+                                                : "View Quotation and Evidence")
+
+                                        </MudButton>
+                                    </div>
+
                                     <div class="d-flex justify-content-end border-top pt-3 mt-3">
                                         <MudButton Variant="Variant.Filled"
                                                    Color="Color.Primary"

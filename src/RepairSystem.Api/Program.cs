@@ -5,27 +5,30 @@ using Microsoft.IdentityModel.Tokens;
 using RepairSystem.Api.OpenApi;
 using RepairSystem.Api.Security;
 using RepairSystem.Application.Interfaces.Auth;
+using RepairSystem.Application.Interfaces.BusinessActivity;
 using RepairSystem.Application.Interfaces.Complaints;
+using RepairSystem.Application.Interfaces.RepairWorkflow;
+using RepairSystem.Application.Interfaces.SystemLogs;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Application.Services.Auth;
+using RepairSystem.Application.Services.BusinessActivity;
 using RepairSystem.Application.Services.Complaints;
+using RepairSystem.Application.Services.RepairWorkflow;
+using RepairSystem.Application.Services.SystemLogs;
 using RepairSystem.Domain.Entities;
 using RepairSystem.Infrastructure.Data;
+using RepairSystem.Infrastructure.Repositories.BusinessActivity;
 using RepairSystem.Infrastructure.Repositories.Complaints;
+using RepairSystem.Infrastructure.Repositories.RepairWorkflow;
+using RepairSystem.Infrastructure.Repositories.SystemLogs;
 using RepairSystem.Infrastructure.Repositories.Users;
 using Serilog;
 using Serilog.Events;
+using Serilog.Sinks.MSSqlServer;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Diagnostics;
 using System.Security.Claims;
-using Serilog.Sinks.MSSqlServer;
-using RepairSystem.Application.Interfaces.SystemLogs;
-using RepairSystem.Application.Services.SystemLogs;
-using RepairSystem.Infrastructure.Repositories.SystemLogs;
-using RepairSystem.Application.Interfaces.BusinessActivity;
-using RepairSystem.Application.Services.BusinessActivity;
-using RepairSystem.Infrastructure.Repositories.BusinessActivity;
 
 
 // start the API and load its configuration
@@ -262,6 +265,12 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IBusinessActivityService,
     BusinessActivityService>();
+
+builder.Services.AddScoped<
+    IRepairWorkflowRepository,
+    RepairWorkflowRepository>();
+
+builder.Services.AddScoped<RepairWorkflowService>();
 
 builder.Services.AddSingleton<
     IAccessTokenGenerator,

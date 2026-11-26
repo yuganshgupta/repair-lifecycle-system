@@ -22,6 +22,53 @@ namespace RepairSystem.Infrastructure.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("RepairSystem.Domain.Entities.Attachment", b =>
+                {
+                    b.Property<int>("AttachmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttachmentId"));
+
+                    b.Property<int>("ComplaintId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UploadedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("AttachmentId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.HasIndex("ComplaintId", "Purpose");
+
+                    b.ToTable("Attachments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Attachments_FileSize", "[FileSizeBytes] > 0 AND [FileSizeBytes] <= 20971520");
+
+                            t.HasCheckConstraint("CK_Attachments_Purpose", "[Purpose] IN (0, 1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("RepairSystem.Domain.Entities.BusinessActivityEvent", b =>
                 {
                     b.Property<int>("BusinessActivityEventId")
@@ -189,6 +236,117 @@ namespace RepairSystem.Infrastructure.Data.Migrations
                     b.HasIndex("ComplaintId");
 
                     b.ToTable("ComplaintStatusHistories");
+                });
+
+            modelBuilder.Entity("RepairSystem.Domain.Entities.Quote", b =>
+                {
+                    b.Property<int>("QuoteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuoteId"));
+
+                    b.Property<int>("ComplaintId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerDecision")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("DecisionTimestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DiagnosticFindings")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal>("EstimatedTotalCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("InspectionFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsWarrantyValid")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("TechnicianId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("WarrantyRejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("QuoteId");
+
+                    b.HasIndex("ComplaintId")
+                        .IsUnique();
+
+                    b.HasIndex("TechnicianId");
+
+                    b.ToTable("Quotes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Quotes_CustomerDecision", "[CustomerDecision] IN (0, 1, 2)");
+
+                            t.HasCheckConstraint("CK_Quotes_EstimatedTotalCost", "[EstimatedTotalCost] >= 0");
+
+                            t.HasCheckConstraint("CK_Quotes_InspectionFee", "[InspectionFee] >= 0");
+
+                            t.HasCheckConstraint("CK_Quotes_WarrantyCharges", "([IsWarrantyValid] = 1 AND [InspectionFee] = 0 AND [EstimatedTotalCost] = 0) OR ([IsWarrantyValid] = 0 AND [InspectionFee] > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("RepairSystem.Domain.Entities.QuoteItem", b =>
+                {
+                    b.Property<int>("QuoteItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuoteItemId"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("ItemType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuoteId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("QuoteItemId");
+
+                    b.HasIndex("QuoteId");
+
+                    b.ToTable("QuoteItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_QuoteItems_ItemType", "[ItemType] IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_QuoteItems_Quantity", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("CK_QuoteItems_UnitPrice", "[UnitPrice] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("RepairSystem.Domain.Entities.RefreshToken", b =>
@@ -368,6 +526,25 @@ namespace RepairSystem.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RepairSystem.Domain.Entities.Attachment", b =>
+                {
+                    b.HasOne("RepairSystem.Domain.Entities.Complaint", "Complaint")
+                        .WithMany()
+                        .HasForeignKey("ComplaintId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RepairSystem.Domain.Entities.User", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Complaint");
+
+                    b.Navigation("UploadedByUser");
+                });
+
             modelBuilder.Entity("RepairSystem.Domain.Entities.Complaint", b =>
                 {
                     b.HasOne("RepairSystem.Domain.Entities.User", "AssignedTechnician")
@@ -405,6 +582,36 @@ namespace RepairSystem.Infrastructure.Data.Migrations
                     b.Navigation("Complaint");
                 });
 
+            modelBuilder.Entity("RepairSystem.Domain.Entities.Quote", b =>
+                {
+                    b.HasOne("RepairSystem.Domain.Entities.Complaint", "Complaint")
+                        .WithOne()
+                        .HasForeignKey("RepairSystem.Domain.Entities.Quote", "ComplaintId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RepairSystem.Domain.Entities.User", "Technician")
+                        .WithMany()
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Complaint");
+
+                    b.Navigation("Technician");
+                });
+
+            modelBuilder.Entity("RepairSystem.Domain.Entities.QuoteItem", b =>
+                {
+                    b.HasOne("RepairSystem.Domain.Entities.Quote", "Quote")
+                        .WithMany("Items")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Quote");
+                });
+
             modelBuilder.Entity("RepairSystem.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("RepairSystem.Domain.Entities.User", "User")
@@ -414,6 +621,11 @@ namespace RepairSystem.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RepairSystem.Domain.Entities.Quote", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("RepairSystem.Domain.Entities.User", b =>

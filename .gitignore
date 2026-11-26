@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 
 # Local-only audit report
 /ui-audit-report.txt
+
+# Private uploaded repair evidence
+src/RepairSystem.Api/App_Data/
