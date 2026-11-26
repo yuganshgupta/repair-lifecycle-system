@@ -136,9 +136,12 @@ public class AuthService : IAuthService
         }).ToList();
     }
 
-    public async Task<UserUpdateResult> UpdateUserAsync(
-    int userId,
-    UpdateUserRequestDto request)
+    public Task<UserUpdateResult> UpdateUserAsync(
+        int userId, UpdateUserRequestDto request) =>
+        _userRepository.ExecuteAccountChangeAsync(() => UpdateUserCoreAsync(userId, request));
+
+    private async Task<UserUpdateResult> UpdateUserCoreAsync(
+        int userId, UpdateUserRequestDto request)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(userId);
         ArgumentNullException.ThrowIfNull(request);
@@ -174,6 +177,20 @@ public class AuthService : IAuthService
             return UserUpdateResult.EmailAlreadyExists;
         }
 
+        if (user.Role != role.Value)
+        {
+            if (user.IsActive && user.Role == UserRole.Admin &&
+                await _userRepository.CountActiveAdminsAsync() <= 1)
+            {
+                return UserUpdateResult.CannotDemoteLastActiveAdmin;
+            }
+
+            if (await _userRepository.HasOpenComplaintsAsync(userId, user.Role))
+            {
+                return UserUpdateResult.HasOpenComplaints;
+            }
+        }
+
         user.FullName = request.FullName.Trim();
         user.Email = email;
         user.Role = role.Value;
@@ -183,10 +200,13 @@ public class AuthService : IAuthService
         return UserUpdateResult.Updated;
     }
 
-    public async Task<UserStatusUpdateResult> UpdateUserStatusAsync(
-    int requestingAdminId,
-    int targetUserId,
-    bool isActive)
+    public Task<UserStatusUpdateResult> UpdateUserStatusAsync(
+        int requestingAdminId, int targetUserId, bool isActive) =>
+        _userRepository.ExecuteAccountChangeAsync(() =>
+            UpdateUserStatusCoreAsync(requestingAdminId, targetUserId, isActive));
+
+    private async Task<UserStatusUpdateResult> UpdateUserStatusCoreAsync(
+        int requestingAdminId, int targetUserId, bool isActive)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(requestingAdminId);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetUserId);
@@ -212,6 +232,9 @@ public class AuthService : IAuthService
                 if (activeAdminCount <= 1)
                     return UserStatusUpdateResult.CannotDeactivateLastActiveAdmin;
             }
+
+            if (await _userRepository.HasOpenComplaintsAsync(targetUserId, targetUser.Role))
+                return UserStatusUpdateResult.HasOpenComplaints;
         }
 
         targetUser.IsActive = isActive;

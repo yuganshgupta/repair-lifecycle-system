@@ -840,6 +840,17 @@ public sealed class ComplaintServiceTests
             return Task.CompletedTask;
         }
 
+        public bool HasOpenComplaints { get; set; }
+
+        public Task<bool> HasOpenComplaintsAsync(int userId, UserRole role)
+            => Task.FromResult(HasOpenComplaints);
+
+        public Task<T> ExecuteAccountChangeAsync<T>(Func<Task<T>> operation)
+            => operation();
+
+        public Task<bool> IsActiveInRoleAsync(int userId, UserRole role, CancellationToken ct)
+            => throw new NotSupportedException();
+
         public Task<int> CountActiveAdminsAsync()
         {
             return Task.FromResult(0);

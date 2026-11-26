@@ -6,5 +6,6 @@ public enum UserStatusUpdateResult
     NotFound,
     AlreadyInRequestedState,
     CannotDeactivateOwnAccount,
-    CannotDeactivateLastActiveAdmin
+    CannotDeactivateLastActiveAdmin,
+    HasOpenComplaints
 }

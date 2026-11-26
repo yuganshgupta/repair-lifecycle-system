@@ -1,4 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using RepairSystem.Application.Contracts.Users;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Domain.Entities;
 using RepairSystem.Domain.Enums;
@@ -54,6 +57,47 @@ public class UserRepository : IUserRepository
     public async Task UpdateAsync(User user)
     {
         await _context.SaveChangesAsync();
+    }
+
+    public Task<bool> IsActiveInRoleAsync(int userId, UserRole role, CancellationToken ct)
+    {
+        // Query the database, not the tracked entity cache or JWT role alone.
+        return _context.Users.AnyAsync(
+            user => user.UserId == userId && user.IsActive && user.Role == role, ct);
+    }
+
+    public Task<bool> HasOpenComplaintsAsync(int userId, UserRole role)
+    {
+        var open = _context.Complaints.Where(c =>
+            c.Status != ComplaintStatus.Completed && c.Status != ComplaintStatus.Cancelled);
+
+        return role switch
+        {
+            UserRole.Customer => open.AnyAsync(c => c.CustomerId == userId),
+            UserRole.Technician => open.AnyAsync(c => c.AssignedTechnicianId == userId),
+            _ => Task.FromResult(false)
+        };
+    }
+
+    public async Task<T> ExecuteAccountChangeAsync<T>(Func<Task<T>> operation)
+    {
+        try
+        {
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable);
+            var result = await operation();
+            await transaction.CommitAsync();
+            return result;
+        }
+        catch (SqlException ex) when (ex.Number is 1205 or 2601 or 2627)
+        {
+            throw new AccountChangeConflictException(ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException
+            { Number: 1205 or 2601 or 2627 })
+        {
+            throw new AccountChangeConflictException(ex);
+        }
     }
 
     public async Task<int> CountActiveAdminsAsync()

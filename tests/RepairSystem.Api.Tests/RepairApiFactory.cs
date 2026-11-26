@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using RepairSystem.Application.Interfaces.Auth;
 using RepairSystem.Application.Interfaces.Complaints;
 using RepairSystem.Application.Interfaces.SystemLogs;
+using RepairSystem.Application.Interfaces.Users;
 using System.Text;
 
 namespace RepairSystem.Api.Tests;
@@ -22,6 +23,8 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
         Encoding.UTF8.GetBytes("0123456789ABCDEF0123456789ABCDEF");
 
     public FakeAuthService FakeAuthService { get; } = new();
+
+    public FakeTokenAccountRepository TokenAccounts { get; } = new();
 
     public FakeComplaintService FakeComplaintService { get; } = new();
 
@@ -65,6 +68,11 @@ public sealed class RepairApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            // Older controller tests use synthetic tokens. New account-state tests
+            // explicitly populate the fake account store and disable permissive mode.
+            services.RemoveAll<IUserRepository>();
+            services.AddSingleton<IUserRepository>(TokenAccounts);
+
             services.RemoveAll<IAuthService>();
             services.AddSingleton<IAuthService>(FakeAuthService);
 

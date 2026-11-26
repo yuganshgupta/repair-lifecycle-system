@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RepairSystem.Application.Contracts.Auth;
+using RepairSystem.Application.Contracts.Users;
 using RepairSystem.Application.Interfaces.Users;
 using RepairSystem.Application.Services.Auth;
 using RepairSystem.Domain.Entities;
@@ -241,6 +242,91 @@ public sealed class AuthServiceTests
         Assert.IsNull(repository.AddedUser);
     }
 
+    [TestMethod]
+    public async Task UpdateUser_LastActiveAdminCannotBeDemoted()
+    {
+        var repository = Account(UserRole.Admin);
+        repository.ActiveAdminCount = 1;
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        var result = await service.UpdateUserAsync(42, Edit(UserRole.Technician));
+        Assert.AreEqual(UserUpdateResult.CannotDemoteLastActiveAdmin, result);
+        Assert.AreEqual(UserRole.Admin, repository.UserToFindById!.Role);
+        Assert.IsNull(repository.UpdatedUser);
+    }
+
+    [TestMethod]
+    public async Task UpdateUser_AdminCanBeDemotedWhenAnotherActiveAdminRemains()
+    {
+        var repository = Account(UserRole.Admin);
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        Assert.AreEqual(UserUpdateResult.Updated, await service.UpdateUserAsync(42, Edit(UserRole.Technician)));
+        Assert.AreEqual(UserRole.Technician, repository.UpdatedUser!.Role);
+    }
+
+    [TestMethod]
+    public async Task UpdateUser_LastAdminCanEditProfileWithoutChangingRole()
+    {
+        var repository = Account(UserRole.Admin);
+        repository.ActiveAdminCount = 1;
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        Assert.AreEqual(UserUpdateResult.Updated, await service.UpdateUserAsync(42, Edit(UserRole.Admin)));
+    }
+
+    [TestMethod]
+    [DataRow("Technician")]
+    [DataRow("Customer")]
+    public async Task UpdateUser_RoleChangeBlockedWithOpenComplaints(string role)
+    {
+        var repository = Account(Enum.Parse<UserRole>(role));
+        repository.HasOpenComplaints = true;
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        Assert.AreEqual(UserUpdateResult.HasOpenComplaints, await service.UpdateUserAsync(42, Edit(UserRole.Admin)));
+        Assert.IsNull(repository.UpdatedUser);
+    }
+
+    [TestMethod]
+    [DataRow("Technician")]
+    [DataRow("Customer")]
+    public async Task DeactivateUser_BlockedWithOpenComplaints(string role)
+    {
+        var repository = Account(Enum.Parse<UserRole>(role));
+        repository.HasOpenComplaints = true;
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        Assert.AreEqual(UserStatusUpdateResult.HasOpenComplaints, await service.UpdateUserStatusAsync(99, 42, false));
+        Assert.IsTrue(repository.UserToFindById!.IsActive);
+        Assert.IsNull(repository.UpdatedUser);
+    }
+
+    [TestMethod]
+    public async Task DeactivateUser_LastAdminRemainsProtected()
+    {
+        var repository = Account(UserRole.Admin);
+        repository.ActiveAdminCount = 1;
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        Assert.AreEqual(UserStatusUpdateResult.CannotDeactivateLastActiveAdmin,
+            await service.UpdateUserStatusAsync(99, 42, false));
+        Assert.IsNull(repository.UpdatedUser);
+    }
+
+    [TestMethod]
+    public async Task DeactivateUser_NoOpenComplaintsSucceeds()
+    {
+        var repository = Account(UserRole.Technician);
+        var service = new AuthService(repository, new PasswordHasher<User>());
+        Assert.AreEqual(UserStatusUpdateResult.Updated, await service.UpdateUserStatusAsync(99, 42, false));
+        Assert.IsFalse(repository.UpdatedUser!.IsActive);
+    }
+
+    private static FakeUserRepository Account(UserRole role) => new()
+    {
+        UserToFindById = new User { UserId = 42, FullName = "Test User", Email = "test@example.com", Role = role, IsActive = true }
+    };
+
+    private static UpdateUserRequestDto Edit(UserRole role) => new()
+    {
+        FullName = "Updated User", Email = "test@example.com", Role = role.ToString()
+    };
+
     private sealed class FakeUserRepository : IUserRepository
     {
         public User? UserToFind { get; set; }
@@ -292,6 +378,17 @@ public sealed class AuthServiceTests
         }
 
         public int ActiveAdminCount { get; set; } = 2;
+
+        public bool HasOpenComplaints { get; set; }
+
+        public Task<bool> HasOpenComplaintsAsync(int userId, UserRole role)
+            => Task.FromResult(HasOpenComplaints);
+
+        public Task<T> ExecuteAccountChangeAsync<T>(Func<Task<T>> operation)
+            => operation();
+
+        public Task<bool> IsActiveInRoleAsync(int userId, UserRole role, CancellationToken ct)
+            => throw new NotSupportedException();
 
         public Task<int> CountActiveAdminsAsync()
         {

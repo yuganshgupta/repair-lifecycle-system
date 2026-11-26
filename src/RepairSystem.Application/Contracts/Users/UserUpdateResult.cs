@@ -5,5 +5,7 @@ public enum UserUpdateResult
     Updated,
     NotFound,
     EmailAlreadyExists,
-    InvalidRole
+    InvalidRole,
+    CannotDemoteLastActiveAdmin,
+    HasOpenComplaints
 }

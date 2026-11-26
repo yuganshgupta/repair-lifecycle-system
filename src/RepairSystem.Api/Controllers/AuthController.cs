@@ -143,6 +143,16 @@ public class AuthController : ControllerBase
                 message = "Another account already uses this email address."
             }),
 
+            UserUpdateResult.CannotDemoteLastActiveAdmin => Conflict(new
+            {
+                message = "The last active Admin account cannot be demoted."
+            }),
+
+            UserUpdateResult.HasOpenComplaints => Conflict(new
+            {
+                message = "Resolve or reassign open complaints before changing this user's role."
+            }),
+
             UserUpdateResult.InvalidRole => BadRequest(new
             {
                 message = "The requested role is invalid."
@@ -187,6 +197,9 @@ public class AuthController : ControllerBase
 
             UserStatusUpdateResult.CannotDeactivateLastActiveAdmin =>
                 Conflict(new { message = "The last active Admin account cannot be deactivated." }),
+
+            UserStatusUpdateResult.HasOpenComplaints =>
+                Conflict(new { message = "Resolve or reassign open complaints before deactivating this account." }),
 
             _ => BadRequest()
         };

@@ -16,6 +16,7 @@ using RepairSystem.Application.Services.Complaints;
 using RepairSystem.Application.Services.RepairWorkflow;
 using RepairSystem.Application.Services.SystemLogs;
 using RepairSystem.Domain.Entities;
+using RepairSystem.Domain.Enums;
 using RepairSystem.Infrastructure.Data;
 using RepairSystem.Infrastructure.Repositories.BusinessActivity;
 using RepairSystem.Infrastructure.Repositories.Complaints;
@@ -280,16 +281,46 @@ builder.Services.AddSingleton<
 // These are the checks the API uses before trusting a JWT
 builder.Services.AddAuthentication(
     JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(options =>
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = signingKey,
-        ValidateIssuer = true,
-        ValidIssuer = jwtIssuer,
-        ValidateAudience = true,
-        ValidAudience = jwtAudience,
-        ValidateLifetime = true
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = signingKey,
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true
+        };
 
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var principal = context.Principal;
+                var userIdClaim = principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var roleClaim = principal?.FindFirst(ClaimTypes.Role)?.Value;
+
+                if (!int.TryParse(userIdClaim, out var userId) || userId <= 0 ||
+                    !Enum.TryParse<UserRole>(roleClaim, out var role) ||
+                    !Enum.IsDefined(role) || role.ToString() != roleClaim ||
+                    principal!.FindAll(ClaimTypes.Role).Count() != 1)
+                {
+                    context.Fail("Invalid account claims.");
+                    return;
+                }
+
+                var users = context.HttpContext.RequestServices
+                    .GetRequiredService<IUserRepository>();
+
+                if (!await users.IsActiveInRoleAsync(
+                    userId, role, context.HttpContext.RequestAborted))
+                {
+                    context.Fail("Account is inactive, missing or its role has changed.");
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -381,6 +412,11 @@ app.Use(async (context, next) =>
     {
         context.Response.StatusCode = StatusCodes.Status409Conflict;
         await context.Response.WriteAsJsonAsync(new { message = "The ticket changed. Refresh and try again." });
+    }
+    catch (RepairSystem.Application.Contracts.Users.AccountChangeConflictException ex) when (!context.Response.HasStarted)
+    {
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = ex.Message });
     }
 });
 
