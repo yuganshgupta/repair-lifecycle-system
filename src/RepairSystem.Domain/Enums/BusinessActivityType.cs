@@ -22,5 +22,8 @@ public enum BusinessActivityType
 
     RepairStarted = 12,
     RepairCompleted = 13,
-    ComplaintCancelled = 14
+    ComplaintCancelled = 14,
+    TechnicianClaimed = 15,
+    TechnicianTransferred = 16,
+    TechnicianReassigned = 17
 }

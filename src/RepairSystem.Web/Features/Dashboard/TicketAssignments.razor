@@ -1,0 +1,181 @@
+@page "/ticket-assignments"
+@attribute [Authorize(Roles = "Admin,Technician")]
+@rendermode InteractiveServer
+@using System.Net.Http.Headers
+@using System.Text.Json
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApiTokenSessionStore TokenStore
+
+<PageTitle>Ticket Assignment Management</PageTitle>
+<div class="container mt-4 mb-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">Ticket Assignment Management</h1>
+            <p class="text-muted mb-0">Claim or transfer active tickets without resetting repair progress.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" disabled="@_busy" @onclick="RefreshAsync">Refresh</button>
+            <a class="btn btn-outline-secondary" href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (_message is not null)
+    {
+        <div class="alert alert-success" role="status">@_message</div>
+    }
+    @if (_busy)
+    {
+        <p class="text-muted">Loading or saving...</p>
+    }
+    @if (_board is not null)
+    {
+        <h4>@(_board.IsAdmin ? "Active assigned tickets" : "Available and my active tickets")</h4>
+        @if (_board.IsAdmin)
+        {
+            <p><a href="/admin/assignments">Assign new submitted complaints</a></p>
+        }
+        else
+        {
+            <p><a href="/technician/complaints">My assigned repairs</a></p>
+        }
+        @if (_board.Tickets.Count == 0)
+        {
+            <p class="text-muted">No eligible tickets found.</p>
+        }
+        @foreach (var ticket in _board.Tickets)
+        {
+            <div class="card mb-3" @key="ticket.ComplaintId">
+                <div class="card-body">
+                    <h5>@ticket.TicketNumber</h5>
+                    <p>@ticket.Device — <strong>@ticket.Status</strong></p>
+                    @if (ticket.AssignedTechnicianId is null)
+                    {
+                        <button class="btn btn-primary" disabled="@_busy" @onclick="() => ClaimAsync(ticket)">Claim ticket</button>
+                    }
+                    else
+                    {
+                        <p>Current technician: @ticket.AssignedTechnicianName</p>
+                        <p><a href="@($"/repair/{ticket.ComplaintId}")">View quotation and evidence</a></p>
+                        <fieldset disabled="@_busy">
+                            <label class="form-label" for="@($"target-{ticket.ComplaintId}")">New technician</label>
+                            <select id="@($"target-{ticket.ComplaintId}")" class="form-select mb-2" @bind="ticket.TargetId">
+                                <option value="0">Choose technician</option>
+                                @foreach (var tech in _board.Technicians.Where(t => t.UserId != ticket.AssignedTechnicianId))
+                                {
+                                    <option value="@tech.UserId">@tech.FullName</option>
+                                }
+                            </select>
+                            <label class="form-label" for="@($"reason-{ticket.ComplaintId}")">Reason</label>
+                            <textarea id="@($"reason-{ticket.ComplaintId}")" class="form-control mb-2" rows="2" maxlength="500" @bind="ticket.Reason" @bind:event="oninput"></textarea>
+                            <button class="btn btn-outline-primary" disabled="@(ticket.TargetId <= 0 || string.IsNullOrWhiteSpace(ticket.Reason))" @onclick="() => MoveAsync(ticket)">
+                                @(_board.IsAdmin ? "Reassign ticket" : "Transfer ticket")
+                            </button>
+                        </fieldset>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private Board? _board;
+    private bool _busy;
+    private string? _error, _message;
+    private const string Api = "api/ticket-assignments";
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+    private Task RefreshAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync(Api);
+        await EnsureSuccessAsync(response);
+        _board = await response.Content.ReadFromJsonAsync<Board>() ??
+            throw new InvalidOperationException("Invalid assignment response.");
+    }
+
+    private Task ClaimAsync(Ticket ticket) => RunAsync(async client =>
+    {
+        using var response = await client.PostAsync($"{Api}/{ticket.ComplaintId}/claim", null);
+        await EnsureSuccessAsync(response);
+        _message = "Ticket claimed successfully.";
+        _board = null;
+        await LoadAsync(client);
+    });
+
+    private Task MoveAsync(Ticket ticket) => RunAsync(async client =>
+    {
+        using var response = await client.PostAsJsonAsync($"{Api}/{ticket.ComplaintId}/move", new
+        {
+            TechnicianId = ticket.TargetId,
+            ExpectedTechnicianId = ticket.AssignedTechnicianId,
+            Reason = ticket.Reason
+        });
+        await EnsureSuccessAsync(response);
+        _message = "Assignment changed successfully.";
+        _board = null;
+        await LoadAsync(client);
+    });
+
+    private async Task RunAsync(Func<HttpClient, Task> operation)
+    {
+        if (_busy) return;
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var sessionId = auth.User.FindFirst(WebAuthenticationDefaults.SessionIdClaimType)?.Value;
+            if (string.IsNullOrWhiteSpace(sessionId) || !TokenStore.TryGet(sessionId, out var session) ||
+                session is null || session.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+            {
+                _board = null;
+                _error = "Please sign out and sign in again.";
+                return;
+            }
+            using var client = HttpClientFactory.CreateClient("RepairApi");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken);
+            await operation(client);
+        }
+        catch (InvalidOperationException ex) { _error = ex.Message; }
+        catch (HttpRequestException) { _error = "Could not contact the API. Refresh before retrying."; }
+        catch (TaskCanceledException) { _error = "Request timed out. Refresh before retrying."; }
+        catch (JsonException) { _error = "Invalid API response."; }
+        finally { _busy = false; }
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var message = $"Request failed ({(int)response.StatusCode}). Refresh before retrying.";
+        try
+        {
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (json.RootElement.ValueKind == JsonValueKind.Object &&
+                json.RootElement.TryGetProperty("message", out var value) && value.ValueKind == JsonValueKind.String)
+                message = value.GetString() ?? message;
+        }
+        catch (JsonException) { }
+        throw new InvalidOperationException(message);
+    }
+
+    public sealed record Board(bool IsAdmin, List<Ticket> Tickets, List<Technician> Technicians);
+    public sealed record Technician(int UserId, string FullName);
+    public sealed class Ticket
+    {
+        public int ComplaintId { get; set; }
+        public string TicketNumber { get; set; } = "";
+        public string Device { get; set; } = "";
+        public string Status { get; set; } = "";
+        public int? AssignedTechnicianId { get; set; }
+        public string? AssignedTechnicianName { get; set; }
+        public int TargetId { get; set; }
+        public string Reason { get; set; } = "";
+    }
+}

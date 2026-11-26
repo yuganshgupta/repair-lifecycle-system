@@ -305,6 +305,11 @@ builder.Services.AddOpenApi(options =>
     options.AddOperationTransformer<JwtBearerOpenApiTransformer>();
 });
 
+builder.Services.AddScoped<
+    RepairSystem.Application.Interfaces.Assignments.ITicketAssignmentRepository,
+    RepairSystem.Infrastructure.Repositories.Assignments.TicketAssignmentRepository>();
+builder.Services.AddScoped<RepairSystem.Application.Services.Assignments.TicketAssignmentService>();
+
 var app = builder.Build();
 
 app.UseSerilogRequestLogging(options =>
@@ -367,6 +372,17 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Handle optimistic concurrency conflicts in both old and new complaint endpoints.
+app.Use(async (context, next) =>
+{
+    try { await next(context); }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException) when (!context.Response.HasStarted)
+    {
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = "The ticket changed. Refresh and try again." });
+    }
+});
 
 app.UseAuthentication();
 

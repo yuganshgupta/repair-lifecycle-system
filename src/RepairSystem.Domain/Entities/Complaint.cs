@@ -47,6 +47,19 @@ public class Complaint
         ChangeStatus(ComplaintStatus.Assigned);
     }
 
+    public void ReassignToTechnician(int technicianId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(technicianId);
+        if (!AssignedTechnicianId.HasValue || Status is not (
+            ComplaintStatus.Assigned or ComplaintStatus.InDiagnosis or
+            ComplaintStatus.QuotePending or ComplaintStatus.Approved or ComplaintStatus.InRepair))
+            throw new InvalidOperationException("Only active assigned complaints can be reassigned.");
+        if (AssignedTechnicianId == technicianId)
+            throw new InvalidOperationException("Complaint is already assigned to that technician.");
+        AssignedTechnicianId = technicianId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void ChangeStatus(ComplaintStatus newStatus)
     {
         if (!Enum.IsDefined(newStatus))

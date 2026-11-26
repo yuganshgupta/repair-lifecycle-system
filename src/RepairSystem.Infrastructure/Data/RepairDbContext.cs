@@ -40,6 +40,11 @@ public class RepairDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<Complaint>()
+            .Property<byte[]>("RowVersion")
+            .IsRequired()
+            .IsRowVersion();
+
 
         modelBuilder.Entity<Quote>(entity =>
         {
